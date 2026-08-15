@@ -38,8 +38,17 @@ $PY scripts/07_experiment.py
 echo "==> 08: paired analysis + figures"
 $PY scripts/08_analyze.py
 
+echo "==> 04b: pull a mecka sample for the cross-lab audit (~6 min)"
+$PY scripts/04_pull_poses.py mecka 400
+
+echo "==> 10: cross-lab quality audit"
+$PY scripts/10_cross_lab_audit.py
+
 echo "==> 09: generate the validation report"
 $PY scripts/09_report.py
 
+echo "==> 11: build the summary slide"
+$PY scripts/11_slide.py
+
 echo
-echo "Done. See reports/validation.md"
+echo "Done. See reports/validation.md and reports/egoscore_summary_slide.png"

@@ -111,6 +111,31 @@ produces a run of identical trailing frames that looks exactly like a frozen tra
 frozen-tracker count is zero *because* we truncate; without that step it would have been
 near 100% and the gate would have thrown away the entire dataset.
 
+## Cross-lab audit: does the gate discriminate?
+
+A gate that fires at the same rate everywhere is measuring its own thresholds, not
+quality. We ran it against a 400-episode sample of `mecka` fold_clothes as a check.
+
+Only the intrinsics-independent signals are compared: hands-out-of-frame depends on
+camera intrinsics that we verified for the Aria rig used by `rl2` and have not verified
+for `mecka`, so reporting it cross-lab would be a number we cannot stand behind.
+
+| lab   |   n_episodes | tracking_dropout   | frozen_tracker   | too_short   | no_motion   | ANY   |   median_dur_s |   median_motion |
+|:------|-------------:|:-------------------|:-----------------|:------------|:------------|:------|---------------:|----------------:|
+| mecka |          400 | 0.0%               | 0.0%             | 1.2%        | 0.0%        | 1.2%  |              7 |            0.34 |
+| rl2   |          572 | 0.0%               | 0.0%             | 0.0%        | 0.0%        | 0.0%  |             93 |            0.55 |
+
+**Both labs are clean on tracking dropout and frozen trackers — 0.0% in each.** That is a
+genuine finding about EgoVerse rather than a null result: the pose pipelines are solid,
+and a curation engine built around imagined tracking failures would find nothing to do.
+
+**The more consequential finding is that an "episode" is not a common unit across labs.**
+Median episode duration is 93 s in `rl2` and 6.6 s in `mecka` — a factor of ~14. `rl2`
+episodes are long multi-fold sessions; `mecka` episodes are short single-action clips.
+Anyone budgeting curation in episode counts across labs is comparing incommensurable
+units, and a subset of "1,000 episodes" means wildly different things depending on where
+they came from. Budgeting in frames or seconds would be the safer default.
+
 ## Limitations
 
 Stated plainly, because these are the first things worth attacking.

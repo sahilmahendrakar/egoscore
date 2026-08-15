@@ -4,50 +4,173 @@
 
 > *Which episodes are worth training on?*
 
-EgoVerse ships 1,362 hours / ~80k episodes of egocentric human demonstrations. Not
-all of it helps. This repo picks a subset that does, and — the part that matters —
-**measures whether the pick was actually better than picking at random.**
+EgoVerse ships ~456k episodes. Not all of it helps. This repo picks a subset that does,
+and — the part that actually matters — **measures whether the pick beat picking at random.**
 
-## The claim we are testing
+---
 
-> At a fixed episode budget K, a quality-gated, coverage-maximizing subset trains a
-> better policy than K episodes sampled uniformly at random.
+## Result
 
-We test it with the EgoVerse paper's own offline proxy metric (Avg-MSE) and its own
-two generalization axes (held-out **unseen demonstrators**, held-out **unseen scenes**).
+| Selector | Paired wins vs random | Mean Avg-MSE change |
+|---|---|---|
+| `dpp` (log-det diversity) | **12/12** | **−3.63%** |
+| `kcenter` | 11/12 | −3.42% |
+| `curated` (facility location) | 11/12 | −2.40% |
+| `random_nogate` (no quality gate) | 3/12 | +1.05% |
+| `degenerate` (**positive control**) | 1/12 | **+6.50%** |
 
-## Status
+12 comparisons = 3 seeds × 2 budgets × 2 held-out axes. Every selector is compared to
+`random` at the *same seed and budget*, on the *same* held-out windows.
 
-🚧 Built during the one-day sprint, 2026-08-15. See [`PLAN.md`](./PLAN.md).
+**The honest headline is not "throw away 75% of your data for free."** Training on the
+full gated pool still beats every subset. It is:
 
-## Pipeline
+> At a quarter of the budget, diversity-aware selection closes **43%** (unseen operator)
+> and **59%** (unseen scene) of the gap between a random quarter and using everything.
+
+📄 **[Full validation report →](reports/validation.md)**
+
+![paired](reports/figs/paired.png)
+
+---
+
+## Why the positive control is the most important row
+
+A 3% margin on a proxy metric over a few hundred episodes is easy to disbelieve, and the
+obvious failure mode is a harness too noisy to detect anything at all.
+
+So we included a condition that *should* lose, for a reason established independently by
+the EgoVerse paper: demonstrator and scene diversity improve generalization.
+`degenerate` spends the identical budget but concentrates it into ~10 operator × scene
+groups instead of ~60. At K=25% it is **+13.0%** on unseen operators and **+9.3%** on
+unseen scenes — large, unambiguous, correctly signed.
+
+That is what makes the smaller curated-vs-random margin a measurement rather than noise.
+The control also *weakens* at K=50% (+1.0% / +2.6%), exactly as it should — at half the
+pool you cannot concentrate the budget much. A control that stayed flat would have been
+suspicious.
+
+---
+
+## Method
+
+**Slice.** `fold_clothes`, `lab=rl2`, `human_bimanual` — 572 episodes, 20 operators,
+16 scenes. This is the **only** slice in EgoVerse with a populated operator × scene grid:
+`microagi` (9,896 fold_clothes episodes) carries no operator or scene metadata at all,
+and `mecka` has 2 scenes. Without that grid neither held-out axis is constructible.
+
+**Pipeline.**
 
 ```
 episode table (Postgres)
-        │
-        ├─ quality gate ──────────► drop broken episodes (tracking dropout,
-        │                            frozen pose, out-of-frame hands, degenerate
-        │                            duration, near-zero motion)
-        │
-        ├─ episode embedding ─────► trajectory statistics + DINOv2 visual features
-        │
-        └─ submodular selection ──► facility-location coverage maximization
-                                     (ablations: DPP log-det, k-center, random)
-                                            │
-                                            ▼
-                              validation harness: train identical
-                              BC head on each subset, compare Avg-MSE
+      │
+      ├─ quality gate ──────► deterministic rules, every drop carries a reason
+      │
+      ├─ episode embedding ─► 41 trajectory/keypoint features, whitened
+      │
+      └─ selection ─────────► facility location (1−1/e greedy guarantee),
+                              DPP log-det, k-center, random, degenerate
+                                        │
+                                        ▼
+                         train identical ridge action-chunk policy
+                         on each subset → compare offline Avg-MSE on
+                         held-out unseen operators / unseen scenes
 ```
 
-## Honest limitations
+**Proxy metric.** Offline Avg-MSE, the metric the EgoVerse authors use themselves:
+10 frames of proprioceptive history → 30-step future bimanual EE pose chunk, predicted
+*relative to the current pose* so the model cannot win by memorising room coordinates.
+Random Fourier features + closed-form ridge, so the fit is exact and seed-independent —
+any difference between conditions comes from the data, not from optimiser noise.
 
-Stated up front, because they are the first thing worth asking about:
+**Statistics.** Absolute Avg-MSE swings across seeds because each seed draws a different
+held-out split, shifting every condition at once. Raw means with across-seed error bars
+would understate the effect. All conditions within a seed see an identical split and
+identical eval windows, so we report **paired** differences.
 
-- **Avg-MSE is a proxy, not robot success.** The EgoVerse authors say so themselves and
-  use it anyway as a stable comparative signal. We adopt their protocol and report it
-  as a proxy. See `PLAN.md` for why we still think it is the right call.
-- **Small scale.** One flagship task. Curation effects are noisy at this scale, which is
-  exactly why we run a positive control and report error bars over seeds.
+---
+
+## Three things we found in the data
+
+**Zarr arrays are zero-padded to a chunk boundary.** The true length is `total_frames` in
+the group attrs. Read the raw array without truncating and you get a run of identical
+trailing frames that looks exactly like a frozen tracker. Our frozen-tracker count is
+zero *because* we truncate — without that step it would have been near 100% and the gate
+would have discarded the entire dataset.
+
+**Images cost 84.6 GB for this slice; pose arrays cost 2.3 GB.** So every signal here is
+derived from poses and keypoints alone. That was a deliberate constraint, not a
+shortcut: a curation engine that costs more to run than the training it is supposed to
+save is not worth running.
+
+**An "episode" is not a common unit across labs.** Median episode duration is **93 s in
+`rl2`** and **6.6 s in `mecka`** — a factor of ~14. `rl2` episodes are long multi-fold
+sessions; `mecka` episodes are short single-action clips. Anyone budgeting curation in
+episode counts across labs is comparing incommensurable units: a subset of "1,000
+episodes" means wildly different things depending on where it came from. Budgeting in
+frames or seconds is the safer default.
+
+Both labs are clean on tracking dropout and frozen trackers — **0.0% in each**. That is a
+real finding about EgoVerse, not a null result: the pose pipelines are solid, and a gate
+built around imagined tracking failures would find nothing to do.
+
+---
+
+## Limitations
+
+Stated up front, because they are the first things worth attacking.
+
+1. **Avg-MSE is a proxy, not robot success.** The EgoVerse authors use it while saying so:
+   *"this metric does not directly measure downstream robot performance [but] provides a
+   stable signal for comparing generalization."* We adopt it on exactly those terms.
+2. **The proxy policy is proprioceptive, not visual** — a consequence of the 84.6 GB
+   figure above. A visual policy might rank subsets differently.
+3. **One task, one lab.** No claim of transfer across tasks. The slice was forced by
+   metadata availability, not chosen for favourability.
+4. **Small effect, small pool.** ~3% on a few hundred episodes. The positive control is
+   what makes it interpretable rather than decorative.
+5. **Facility location was our a priori pick and it lost.** `dpp` and `kcenter` both beat
+   it. We report that rather than quietly promoting the winner to headline method: on
+   this slice *spread* seems to matter slightly more than *coverage*, and with 3 seeds we
+   cannot cleanly separate the three.
+
+---
+
+## Deliverables
+
+| | |
+|---|---|
+| Keep/drop recommendations | [`reports/keep_drop.csv`](reports/keep_drop.csv) — per-episode, with reason |
+| Gate audit | [`reports/gate_audit.csv`](reports/gate_audit.csv) — per-rule prevalence |
+| Cross-lab audit | [`reports/cross_lab_summary.csv`](reports/cross_lab_summary.csv) — rl2 vs mecka |
+| Validation report | [`reports/validation.md`](reports/validation.md) |
+| Summary slide | [`reports/egoscore_summary_slide.png`](reports/egoscore_summary_slide.png) · [PDF](reports/egoscore_summary_slide.pdf) |
+| Raw results | [`reports/results.csv`](reports/results.csv), [`reports/paired_deltas.csv`](reports/paired_deltas.csv) |
+| Figures | [`reports/figs/`](reports/figs) |
+
+## Reproducing
+
+The EgoVerse README publishes read-only AWS keys for public dataset access. Put them in
+`~/.egoverse_aws_credentials` in aws-credentials format, then:
+
+```bash
+bash scripts/run_all.sh
+```
+
+Runtime ≈ 15 minutes, dominated by the 1.2 GB pose pull.
+
+## Layout
+
+```
+egoscore/
+  access.py     Postgres + R2 access (no torch dependency)
+  features.py   quality signals + embedding features from poses
+  gate.py       the quality gate and its audit table
+  select.py     random / facility-location / DPP / k-center / degenerate
+  proxy.py      ridge action-chunk policy and Avg-MSE
+scripts/        01..10, run in order; run_all.sh does the whole thing
+reports/        outputs, figures, validation report
+```
 
 ## License
 
