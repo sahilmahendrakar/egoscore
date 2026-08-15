@@ -184,7 +184,7 @@ Stated up front, because they are the first things worth attacking.
 | Gate audit | [`reports/gate_audit.csv`](reports/gate_audit.csv) — per-rule prevalence |
 | Cross-lab audit | [`reports/cross_lab_summary.csv`](reports/cross_lab_summary.csv) — rl2 vs mecka |
 | Validation report | [`reports/validation.md`](reports/validation.md) |
-| Summary slide | [`reports/egoscore_summary_slide.png`](reports/egoscore_summary_slide.png) · [PDF](reports/egoscore_summary_slide.pdf) |
+| **Summary slide (submission)** | [`reports/egoscore_summary_slide.png`](reports/egoscore_summary_slide.png) · [PDF](reports/egoscore_summary_slide.pdf) |
 | Raw results | [`reports/results.csv`](reports/results.csv), [`reports/paired_deltas.csv`](reports/paired_deltas.csv) |
 | Figures | [`reports/figs/`](reports/figs) |
 
