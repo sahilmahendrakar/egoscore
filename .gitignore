@@ -1,0 +1,7 @@
+.venv/
+data/
+__pycache__/
+*.pyc
+.egoverse_aws_credentials
+*.zarr/
+.DS_Store
