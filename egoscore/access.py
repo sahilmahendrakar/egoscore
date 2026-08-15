@@ -25,13 +25,29 @@ DB_SECRETS = ["rds/appdb/appuser", "rds/appdb/appuser-readonly"]
 R2_SECRETS = ["r2/rldb/credentials", "r2/rldb/public/credentials"]
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-CREDS_FILE = REPO_ROOT / ".egoverse_aws_credentials"
+
+# The EgoVerse README publishes read-only IAM keys for public dataset access. We look
+# for them in a few conventional spots rather than vendoring them into this repo.
+CRED_SEARCH_PATHS = [
+    REPO_ROOT / ".egoverse_aws_credentials",
+    REPO_ROOT.parent / "egoverse" / ".egoverse_aws_credentials",
+    Path.home() / ".egoverse_aws_credentials",
+]
 
 
 def _bootstrap_aws_env() -> None:
-    """Point boto3 at the repo-local credentials file if the user has no ambient creds."""
-    if CREDS_FILE.exists():
-        os.environ.setdefault("AWS_SHARED_CREDENTIALS_FILE", str(CREDS_FILE))
+    """Point boto3 at an EgoVerse credentials file if the user has no ambient creds.
+
+    Also disables botocore's default request checksums: recent botocore sends CRC32
+    on every request, and Cloudflare R2 rejects those with an opaque HTTP 400.
+    """
+    os.environ.setdefault("AWS_REQUEST_CHECKSUM_CALCULATION", "when_required")
+    os.environ.setdefault("AWS_RESPONSE_CHECKSUM_VALIDATION", "when_required")
+    if not os.environ.get("AWS_SHARED_CREDENTIALS_FILE"):
+        for path in CRED_SEARCH_PATHS:
+            if path.exists():
+                os.environ["AWS_SHARED_CREDENTIALS_FILE"] = str(path)
+                break
     os.environ.setdefault("AWS_DEFAULT_REGION", REGION)
 
 
@@ -99,15 +115,38 @@ def episode_table(creds: EgoVerseCreds | None = None):
         ),
         pool_pre_ping=True,
     )
-    # The episode table lives in the 'app' schema.
-    return pd.read_sql("SELECT * FROM app.episode", engine)
+    # The episode table lives in the 'app' schema, named 'episodes' (plural).
+    return pd.read_sql("SELECT * FROM app.episodes", engine)
 
 
 def r2_client(creds: EgoVerseCreds | None = None):
+    from botocore.config import Config
+
     creds = creds or load_creds()
-    session = boto3.session.Session(
-        region_name="auto",
+    _bootstrap_aws_env()
+    return boto3.client(
+        "s3",
+        endpoint_url=creds.r2_endpoint,
         aws_access_key_id=creds.r2_access_key,
         aws_secret_access_key=creds.r2_secret_key,
+        region_name="auto",
+        config=Config(
+            signature_version="s3v4",
+            max_pool_connections=64,
+            retries={"max_attempts": 5, "mode": "standard"},
+        ),
     )
-    return session.client("s3", endpoint_url=creds.r2_endpoint)
+
+
+def r2_fs(creds: EgoVerseCreds | None = None):
+    """fsspec filesystem over R2, for opening zarr stores lazily."""
+    import s3fs
+
+    creds = creds or load_creds()
+    _bootstrap_aws_env()
+    return s3fs.S3FileSystem(
+        key=creds.r2_access_key,
+        secret=creds.r2_secret_key,
+        client_kwargs={"endpoint_url": creds.r2_endpoint, "region_name": "auto"},
+        config_kwargs={"signature_version": "s3v4"},
+    )

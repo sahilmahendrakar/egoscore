@@ -5,3 +5,5 @@ __pycache__/
 .egoverse_aws_credentials
 *.zarr/
 .DS_Store
+reports/episodes_all.csv
+reports/*.log

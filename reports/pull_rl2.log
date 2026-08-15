@@ -1,0 +1,74 @@
+/Users/sahilmahendrakar/dev/egoscore/scripts/04_pull_poses.py:63: ZarrUserWarning: fs (<s3fs.core.S3FileSystem object at 0x107e21710>) was not created with `asynchronous=True`, this may lead to surprising behavior
+  g = zarr.open_group(zarr.storage.FsspecStore(fs, path=prefix), mode="r")
+/Users/sahilmahendrakar/dev/egoscore/.venv/lib/python3.11/site-packages/zarr/storage/_fsspec.py:249: ZarrUserWarning: fs (<s3fs.core.S3FileSystem object at 0x107e21710>) was not created with `asynchronous=True`, this may lead to surprising behavior
+  return type(self)(
+rl2: 572 episodes to pull
+  25/572  ok=25  elapsed=41s
+  50/572  ok=50  elapsed=64s
+  75/572  ok=75  elapsed=90s
+  100/572  ok=100  elapsed=117s
+  125/572  ok=125  elapsed=143s
+  150/572  ok=150  elapsed=165s
+  175/572  ok=175  elapsed=192s
+  200/572  ok=200  elapsed=217s
+  225/572  ok=225  elapsed=243s
+  250/572  ok=250  elapsed=268s
+  275/572  ok=275  elapsed=291s
+  300/572  ok=300  elapsed=316s
+  325/572  ok=325  elapsed=345s
+  350/572  ok=350  elapsed=381s
+  375/572  ok=375  elapsed=406s
+  400/572  ok=400  elapsed=429s
+  425/572  ok=425  elapsed=451s
+  450/572  ok=450  elapsed=475s
+  475/572  ok=475  elapsed=497s
+  500/572  ok=500  elapsed=521s
+  525/572  ok=525  elapsed=543s
+  550/572  ok=550  elapsed=568s
+  572/572  ok=572  elapsed=579s
+
+done in 579s
+status
+ok    572
+
+zarr total_frames vs SQL num_frames disagreement:
+  disagree on 0 / 572 episodes
+  episodes with annotations: 0 / 572
+Traceback (most recent call last):
+  File "/Users/sahilmahendrakar/.local/share/uv/python/cpython-3.11-macos-aarch64-none/lib/python3.11/weakref.py", line 666, in _exitfunc
+    f()
+  File "/Users/sahilmahendrakar/.local/share/uv/python/cpython-3.11-macos-aarch64-none/lib/python3.11/weakref.py", line 590, in __call__
+    return info.func(*info.args, **(info.kwargs or {}))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/sahilmahendrakar/dev/egoscore/.venv/lib/python3.11/site-packages/s3fs/core.py", line 705, in close_session
+    sync(loop, s3.__aexit__, None, None, None, timeout=0.1)
+  File "/Users/sahilmahendrakar/dev/egoscore/.venv/lib/python3.11/site-packages/fsspec/asyn.py", line 103, in sync
+    raise return_result
+  File "/Users/sahilmahendrakar/dev/egoscore/.venv/lib/python3.11/site-packages/fsspec/asyn.py", line 56, in _runner
+    result[0] = await coro
+                ^^^^^^^^^^
+  File "/Users/sahilmahendrakar/.local/share/uv/python/cpython-3.11-macos-aarch64-none/lib/python3.11/asyncio/tasks.py", line 489, in wait_for
+    return fut.result()
+           ^^^^^^^^^^^^
+  File "/Users/sahilmahendrakar/dev/egoscore/.venv/lib/python3.11/site-packages/aiobotocore/session.py", line 41, in __aexit__
+    await self._client.__aexit__(exc_type, exc_val, exc_tb)
+  File "/Users/sahilmahendrakar/dev/egoscore/.venv/lib/python3.11/site-packages/aiobotocore/client.py", line 678, in __aexit__
+    await self._endpoint.http_session.__aexit__(exc_type, exc_val, exc_tb)
+  File "/Users/sahilmahendrakar/dev/egoscore/.venv/lib/python3.11/site-packages/aiobotocore/httpsession.py", line 132, in __aexit__
+    await self._exit_stack.aclose()
+  File "/Users/sahilmahendrakar/.local/share/uv/python/cpython-3.11-macos-aarch64-none/lib/python3.11/contextlib.py", line 687, in aclose
+    await self.__aexit__(None, None, None)
+  File "/Users/sahilmahendrakar/.local/share/uv/python/cpython-3.11-macos-aarch64-none/lib/python3.11/contextlib.py", line 745, in __aexit__
+    raise exc_details[1]
+  File "/Users/sahilmahendrakar/.local/share/uv/python/cpython-3.11-macos-aarch64-none/lib/python3.11/contextlib.py", line 728, in __aexit__
+    cb_suppress = await cb(*exc_details)
+                  ^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/sahilmahendrakar/dev/egoscore/.venv/lib/python3.11/site-packages/aiohttp/client.py", line 1664, in __aexit__
+    await self.close()
+  File "/Users/sahilmahendrakar/dev/egoscore/.venv/lib/python3.11/site-packages/aiohttp/client.py", line 1530, in close
+    await self._connector.close()
+  File "/Users/sahilmahendrakar/dev/egoscore/.venv/lib/python3.11/site-packages/aiohttp/connector.py", line 1069, in close
+    await super().close(abort_ssl=abort_ssl or self._ssl_shutdown_timeout == 0)
+RuntimeError: Task <Task pending name='Task-650184' coro=<ClientCreatorContext.__aexit__() running at /Users/sahilmahendrakar/dev/egoscore/.venv/lib/python3.11/site-packages/aiobotocore/session.py:41> cb=[_release_waiter(<Future pendi...ask_wakeup()]>)() at /Users/sahilmahendrakar/.local/share/uv/python/cpython-3.11-macos-aarch64-none/lib/python3.11/asyncio/tasks.py:431]> got Future <Task pending name='Task-650185' coro=<_wait_for_close() running at /Users/sahilmahendrakar/dev/egoscore/.venv/lib/python3.11/site-packages/aiohttp/connector.py:121>> attached to a different loop
+Task was destroyed but it is pending!
+task: <Task pending name='Task-650185' coro=<_wait_for_close() done, defined at /Users/sahilmahendrakar/dev/egoscore/.venv/lib/python3.11/site-packages/aiohttp/connector.py:121> wait_for=<_GatheringFuture pending cb=[Task.task_wakeup()]>>
