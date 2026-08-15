@@ -9,3 +9,4 @@ reports/episodes_all.csv
 reports/*.log
 demo/egoscore_demo.html
 reports/demo_data.json
+demo/egoscore_deck.html

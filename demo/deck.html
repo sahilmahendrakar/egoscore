@@ -1,0 +1,453 @@
+<title>EgoScore Deck</title>
+<style>
+  :root {
+    color-scheme: light;
+    --surface:        #fcfcfb;
+    --surface-sunk:   #f2f2f0;
+    --surface-raised: #ffffff;
+    --line:           #e0e0dc;
+    --line-strong:    #c8c8c2;
+    --ink:            #14161a;
+    --ink-2:          #52514e;
+    --ink-3:          #7c7b76;
+    --sel:            #2a78d6;
+    --drop:           #e34948;
+    --good:           #1baf7a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --surface: #1a1a19; --surface-sunk: #131312; --surface-raised: #232322;
+      --line: #33332f; --line-strong: #4a4a45;
+      --ink: #f4f4f0; --ink-2: #c3c2b7; --ink-3: #918f86;
+      --sel: #3987e5; --drop: #e66767; --good: #199e70;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --surface: #1a1a19; --surface-sunk: #131312; --surface-raised: #232322;
+    --line: #33332f; --line-strong: #4a4a45;
+    --ink: #f4f4f0; --ink-2: #c3c2b7; --ink-3: #918f86;
+    --sel: #3987e5; --drop: #e66767; --good: #199e70;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; background: var(--surface); color: var(--ink);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased; overflow: hidden;
+  }
+  .mono { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace; }
+
+  /* ---- stage ---- */
+  #stage { position: fixed; inset: 0; display: grid; place-items: center; padding: 2vmin; }
+  .slide {
+    display: none; width: min(1200px, 96vw); max-height: 94vh;
+    overflow-y: auto; overflow-x: hidden;
+    flex-direction: column; gap: 20px;
+  }
+  .slide.on { display: flex; }
+
+  .eyebrow {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: clamp(10px, 1.05vw, 12px); letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--ink-3);
+  }
+  h1 { margin: 0; font-size: clamp(30px, 5.4vw, 62px); line-height: 1.04;
+       letter-spacing: -0.028em; font-weight: 660; text-wrap: balance; }
+  h2 { margin: 0; font-size: clamp(22px, 3.3vw, 38px); line-height: 1.12;
+       letter-spacing: -0.022em; font-weight: 640; text-wrap: balance; }
+  p  { margin: 0; font-size: clamp(14px, 1.55vw, 19px); line-height: 1.55;
+       color: var(--ink-2); max-width: 74ch; }
+  p.big { font-size: clamp(16px, 1.95vw, 24px); color: var(--ink); }
+  strong { color: var(--ink); font-weight: 640; }
+  em.q { color: var(--ink); font-style: normal; font-weight: 640; }
+
+  .quote {
+    border-left: 3px solid var(--sel); padding: 10px 0 10px 18px;
+    font-size: clamp(16px, 2.1vw, 26px); line-height: 1.4; color: var(--ink);
+    font-weight: 560; letter-spacing: -0.012em; max-width: 60ch;
+  }
+  .cite { font-size: clamp(12px, 1.3vw, 15px); color: var(--ink-3); }
+
+  ul { margin: 0; padding-left: 1.15em; display: flex; flex-direction: column; gap: 10px; }
+  li { font-size: clamp(14px, 1.55vw, 19px); line-height: 1.5; color: var(--ink-2); max-width: 72ch; }
+
+  /* Cap figure height so an image slide still fits one screen while presenting. */
+  img.fig { display: block; width: 100%; height: auto; max-height: 44vh;
+            object-fit: contain; border: 1px solid var(--line);
+            border-radius: 9px; background: #fff; }
+
+  /* ---- cards / grid ---- */
+  .grid { display: grid; gap: 14px; }
+  .g2 { grid-template-columns: 1fr 1fr; }
+  .g3 { grid-template-columns: repeat(3, 1fr); }
+  @media (max-width: 760px) { .g2, .g3 { grid-template-columns: 1fr; } }
+  .card {
+    background: var(--surface-raised); border: 1px solid var(--line);
+    border-radius: 10px; padding: 16px 18px; display: flex; flex-direction: column; gap: 7px;
+  }
+  .card .k { font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+             font-size: clamp(9.5px, 1vw, 11px); letter-spacing: 0.11em;
+             text-transform: uppercase; color: var(--ink-3); }
+  .card .v { font-size: clamp(24px, 3.4vw, 40px); font-weight: 660;
+             letter-spacing: -0.024em; font-variant-numeric: tabular-nums; line-height: 1; }
+  .card p { font-size: clamp(12.5px, 1.35vw, 16px); }
+  .card.accent { border-color: var(--sel); }
+  .v.good { color: var(--good); }
+  .v.bad  { color: var(--drop); }
+
+  /* ---- table ---- */
+  .tblwrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line);
+           font-size: clamp(12.5px, 1.45vw, 17px); }
+  th { font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+       font-size: clamp(9.5px, 1vw, 11.5px); letter-spacing: 0.1em;
+       text-transform: uppercase; color: var(--ink-3); font-weight: 620; }
+  td.num { text-align: right; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  tr.hero td { font-weight: 680; color: var(--ink); }
+  tr.ctrl td { color: var(--drop); }
+  /* Element-qualified so the semantic colour still wins inside tr.hero / tr.ctrl. */
+  td.pos { color: var(--drop); font-weight: 660; }
+  td.neg { color: var(--good); font-weight: 660; }
+  td.ns  { color: var(--ink-3); }
+
+  /* ---- pipeline ---- */
+  .pipe { display: flex; flex-direction: column; gap: 10px; }
+  .step { display: grid; grid-template-columns: 30px 1fr; gap: 14px; align-items: start;
+          background: var(--surface-raised); border: 1px solid var(--line);
+          border-radius: 9px; padding: 13px 15px; }
+  .step .n { font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+             font-size: 13px; color: var(--sel); font-weight: 700; padding-top: 2px; }
+  .step .t { font-size: clamp(14px, 1.6vw, 19px); font-weight: 620; color: var(--ink); }
+  .step .d { font-size: clamp(12.5px, 1.35vw, 16px); color: var(--ink-2); line-height: 1.45; }
+
+  /* ---- chrome ---- */
+  #bar { position: fixed; top: 0; left: 0; height: 2px; background: var(--sel);
+         transition: width .22s ease; z-index: 10; }
+  #count { position: fixed; bottom: 14px; right: 18px; z-index: 10;
+           font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+           font-size: 12px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+  #hint { position: fixed; bottom: 14px; left: 18px; z-index: 10;
+          font-size: 12px; color: var(--ink-3); }
+  nav.arrows { position: fixed; bottom: 10px; left: 50%; transform: translateX(-50%);
+               display: flex; gap: 6px; z-index: 10; }
+  nav.arrows button {
+    appearance: none; cursor: pointer; background: var(--surface-raised);
+    border: 1px solid var(--line); color: var(--ink-2);
+    border-radius: 7px; width: 34px; height: 28px; font: inherit; font-size: 14px;
+  }
+  nav.arrows button:hover { border-color: var(--line-strong); color: var(--ink); }
+  nav.arrows button:focus-visible { outline: 2px solid var(--sel); outline-offset: 2px; }
+
+  a { color: var(--sel); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+  @media print {
+    body { overflow: visible; }
+    #stage { position: static; display: block; padding: 0; }
+    .slide { display: flex !important; page-break-after: always; max-height: none; width: 100%; }
+    #bar, #count, #hint, nav.arrows { display: none; }
+  }
+</style>
+
+<div id="bar"></div>
+<div id="stage">
+
+  <!-- 1 -->
+  <section class="slide on">
+    <div class="eyebrow">EgoVerse Data Optimization &amp; Evaluation Suite · Track 1</div>
+    <h1>EgoScore</h1>
+    <p class="big">A curation engine for EgoVerse — and, more to the point, a way to
+      <strong>check whether curating actually helped</strong>.</p>
+    <div class="grid g3">
+      <div class="card"><span class="k">Slice</span><span class="v">572</span>
+        <p><span class="mono">fold_clothes</span> episodes, lab <span class="mono">rl2</span></p></div>
+      <div class="card"><span class="k">Best selector</span><span class="v good">−4.03%</span>
+        <p>Avg-MSE vs random, 40/40 paired wins</p></div>
+      <div class="card accent"><span class="k">Positive control</span><span class="v bad">+7.17%</span>
+        <p>loses 1/40 — the harness demonstrably works</p></div>
+    </div>
+    <p class="cite">github.com/sahilmahendrakar/egoscore</p>
+  </section>
+
+  <!-- 2 -->
+  <section class="slide">
+    <div class="eyebrow">The brief</div>
+    <h2>Three questions nobody can answer deterministically</h2>
+    <div class="grid g3">
+      <div class="card accent"><span class="k">Track 1 — ours</span>
+        <p class="big" style="color:var(--ink)">Which episodes are worth training on?</p></div>
+      <div class="card"><span class="k">Track 2</span><p>How diverse is this subset, really?</p></div>
+      <div class="card"><span class="k">Track 3</span><p>Did the human actually succeed?</p></div>
+    </div>
+    <p>We took Track 1 for one reason: it is the only one of the three whose answer can be
+      <strong>validated without inventing ground truth</strong>. Track 3 would need labels that
+      do not exist in EgoVerse — we would have had to hand-label them ourselves and then grade
+      our own homework.</p>
+  </section>
+
+  <!-- 3 -->
+  <section class="slide">
+    <div class="eyebrow">The claim</div>
+    <h2>Stated so that it can fail</h2>
+    <div class="quote">At a fixed episode budget K, a quality-gated, coverage-maximizing
+      subset trains a better policy than K episodes sampled uniformly at random.</div>
+    <p>Everything in the repo exists to test that one sentence. The budget is held fixed, so
+      this is never "more data wins" — it is <strong>the same amount of data, chosen differently</strong>.</p>
+    <p>Note what the claim does <em class="q">not</em> say: nothing about robot success rates,
+      nothing about other tasks, nothing about other labs.</p>
+  </section>
+
+  <!-- 4 -->
+  <section class="slide">
+    <div class="eyebrow">Finding 0 · before any modelling</div>
+    <h2>Only one slice of EgoVerse can answer the question at all</h2>
+    <div class="tblwrap"><table>
+      <thead><tr><th>Lab</th><th class="num">fold_clothes eps</th><th class="num">Operators</th><th class="num">Scenes</th><th>Usable?</th></tr></thead>
+      <tbody>
+        <tr class="hero"><td class="mono">rl2</td><td class="num">573</td><td class="num">20</td><td class="num">16</td><td>✓ full grid</td></tr>
+        <tr><td class="mono">microagi</td><td class="num">9,896</td><td class="num">0</td><td class="num">0</td><td class="ns">no metadata</td></tr>
+        <tr><td class="mono">mecka</td><td class="num">1,607</td><td class="num">20</td><td class="num">2</td><td class="ns">no scene axis</td></tr>
+        <tr><td class="mono">eth / wang / song</td><td class="num">76 / 40 / 22</td><td class="num">1</td><td class="num">6–10</td><td class="ns">one operator</td></tr>
+      </tbody>
+    </table></div>
+    <p>Generalization has to be measured against something held out. We hold out
+      <strong>unseen operators</strong> and <strong>unseen scenes</strong> — the EgoVerse paper's own two
+      axes. That needs a populated operator×scene grid, and <span class="mono">rl2</span> is the
+      only slice that has one (190 of 320 cells filled).</p>
+    <p class="cite">The biggest slice, microagi at 9,896 episodes, is unusable here — it carries no
+      operator or scene labels at all.</p>
+  </section>
+
+  <!-- 5 -->
+  <section class="slide">
+    <div class="eyebrow">Method</div>
+    <h2>Four steps, all deterministic</h2>
+    <div class="pipe">
+      <div class="step"><span class="n">01</span><div>
+        <div class="t">Quality gate</div>
+        <div class="d">Tracking dropout, frozen tracker, hands out of frame, degenerate duration,
+          near-zero motion. Every drop carries a reason string you can audit. 29 of 572 dropped.</div></div></div>
+      <div class="step"><span class="n">02</span><div>
+        <div class="t">Episode embedding</div>
+        <div class="d">41 trajectory and hand-keypoint features per episode — path length, speed
+          moments, workspace volume, bimanual coordination, grasp aperture, head motion. Whitened.</div></div></div>
+      <div class="step"><span class="n">03</span><div>
+        <div class="t">Selection</div>
+        <div class="d">Greedy facility location (monotone submodular → 1−1/e guarantee), plus DPP
+          log-det and k-center as ablations, against random as the baseline.</div></div></div>
+      <div class="step"><span class="n">04</span><div>
+        <div class="t">Validation</div>
+        <div class="d">Train an identical policy on each subset. Compare offline Avg-MSE on
+          held-out unseen operators and unseen scenes.</div></div></div>
+    </div>
+    <p class="cite">No LLM-as-judge anywhere. Every scoring component is inspectable.</p>
+  </section>
+
+  <!-- 6 -->
+  <section class="slide">
+    <div class="eyebrow">The metric</div>
+    <h2>We borrowed the authors' own proxy — deliberately</h2>
+    <div class="quote">“we report primarily the offline Avg-MSE metric… While this metric does
+      not directly measure downstream robot performance, it provides a stable signal for
+      comparing generalization.”</div>
+    <p class="cite">— EgoVerse, arXiv 2604.07607</p>
+    <p>This matters for defensibility. When someone objects that Avg-MSE is not robot success,
+      the answer is not a defence of our judgement — <strong>the dataset's own authors already
+      conceded the point and used it anyway</strong>, for exactly the purpose we use it: ranking
+      training subsets against each other.</p>
+    <p>Our policy: 10 frames of proprioceptive history → 30-step future bimanual end-effector
+      chunk, predicted <em class="q">relative to the current pose</em> so it cannot win by memorising
+      which room it is in. Closed-form ridge, so the fit is exact and seed-independent — any
+      difference between conditions comes from the data, not from optimiser noise.</p>
+  </section>
+
+  <!-- 7 -->
+  <section class="slide">
+    <div class="eyebrow">Experiment design</div>
+    <h2>Why every comparison is paired</h2>
+    <p>Each seed draws a different held-out split, which shifts absolute Avg-MSE for
+      <em class="q">every</em> condition at once. Across-seed error bars would drown a real effect in
+      split variance.</p>
+    <p class="big">So each selector is compared to random at the <strong>same seed</strong>, the
+      <strong>same budget</strong>, on the <strong>same held-out windows</strong>.</p>
+    <div class="grid g3">
+      <div class="card"><span class="k">Seeds</span><span class="v">10</span><p>split + selection both vary</p></div>
+      <div class="card"><span class="k">Budgets</span><span class="v">2</span><p>25% and 50% of the gated pool</p></div>
+      <div class="card"><span class="k">Held-out axes</span><span class="v">2</span><p>unseen operators, unseen scenes</p></div>
+    </div>
+    <p class="cite">10 × 2 × 2 = 40 paired tests per selector. Significance by two-sided Wilcoxon
+      signed-rank on the paired differences.</p>
+  </section>
+
+  <!-- 8 -->
+  <section class="slide">
+    <div class="eyebrow">Result</div>
+    <h2>Diversity-based selection wins consistently</h2>
+    <div class="tblwrap"><table>
+      <thead><tr><th>Selector</th><th class="num">Paired wins</th><th class="num">Mean Avg-MSE</th><th class="num">Wilcoxon p</th></tr></thead>
+      <tbody>
+        <tr class="hero"><td>dpp — log-det diversity</td><td class="num">40/40</td><td class="num neg">−4.03%</td><td class="num">2e−12</td></tr>
+        <tr><td>k-center</td><td class="num">38/40</td><td class="num neg">−3.61%</td><td class="num">1e−11</td></tr>
+        <tr><td>curated — facility location</td><td class="num">37/40</td><td class="num neg">−2.44%</td><td class="num">1e−09</td></tr>
+        <tr><td>no quality gate</td><td class="num">22/40</td><td class="num ns">−0.11%</td><td class="num ns">n.s.</td></tr>
+        <tr class="ctrl"><td>degenerate — positive control</td><td class="num">1/40</td><td class="num pos">+7.17%</td><td class="num">9e−12</td></tr>
+      </tbody>
+    </table></div>
+    <p><strong>Selection matters here; filtering does not.</strong> The quality gate is
+      statistically indistinguishable from no effect. It drops only 5% of <span class="mono">rl2</span>,
+      almost all for hands leaving frame — on data this clean there is nothing for filtering to bite on.</p>
+    <p class="cite">We report that because it reverses what we concluded at 3 seeds, where the gate
+      looked worth about a percent.</p>
+  </section>
+
+  <!-- 9 -->
+  <section class="slide">
+    <div class="eyebrow">The slide that matters</div>
+    <h2>Why you should believe a 4% margin</h2>
+    <p>A few percent on a proxy metric, on a few hundred episodes, is easy to disbelieve. The
+      obvious failure mode is a harness too noisy to detect anything, where our margin is luck.</p>
+    <p class="big">So we added a condition that <strong>should lose</strong>, for a reason established
+      independently by the EgoVerse paper: demonstrator and scene diversity improve generalization.</p>
+    <img class="fig" src="__FIG_MANIFOLD__" alt="Two panels of the same episode manifold: k-center spreads its selection evenly and covers 104 groups; degenerate clumps and covers 18.">
+    <p><span class="mono">degenerate</span> spends the identical budget concentrated into as few
+      operator×scene groups as possible. It loses <strong>1/40 at +7.17%</strong>. The harness detects
+      the effect the paper reported — so the smaller margins are <strong>measurements, not noise</strong>.</p>
+  </section>
+
+  <!-- 10 -->
+  <section class="slide">
+    <div class="eyebrow">Honesty</div>
+    <h2>What we are not claiming</h2>
+    <p class="big">More data still beats better data at this scale. The full gated pool beats
+      every 25% and 50% subset, <strong>including ours</strong>.</p>
+    <div class="grid g2">
+      <div class="card"><span class="k">The overclaim we avoided</span>
+        <p style="font-size:clamp(14px,1.7vw,20px)">“Throw away 75% of your data for free.”</p></div>
+      <div class="card accent"><span class="k">What we actually measured</span>
+        <p style="font-size:clamp(14px,1.7vw,20px);color:var(--ink)">At ¼ budget, diversity selection closes
+          <strong>56%</strong> (unseen operator) and <strong>50%</strong> (unseen scene) of the gap between a
+          random quarter and using everything.</p></div>
+    </div>
+    <p>That second version is the one useful to somebody deciding what to label, transfer, or
+      train on next — and it is the one we can defend.</p>
+  </section>
+
+  <!-- 11 -->
+  <section class="slide">
+    <div class="eyebrow">Robustness</div>
+    <h2>Did we tune the proxy to get this?</h2>
+    <p>The obvious attack. So we re-ran the comparison across a grid of proxy configurations —
+      regularisation (0.1 / 1 / 10), feature width (256 / 512 / 1024), history (5 / 10 / 20 frames),
+      horizon (15 / 30 / 60 steps) — <strong>re-tuning nothing per condition</strong>.</p>
+    <div class="grid g2">
+      <div class="card"><span class="k">dpp beats random in</span><span class="v good">9/9</span>
+        <p>configurations · mean −6.52% · worst −5.70%</p></div>
+      <div class="card"><span class="k">degenerate beats random in</span><span class="v bad">0/9</span>
+        <p>configurations · mean +11.81%</p></div>
+    </div>
+    <p>The ranking is unchanged in every configuration tested, and the control loses in every one.
+      If the conclusion only held at one setting, it would not be a conclusion.</p>
+  </section>
+
+  <!-- 12 -->
+  <section class="slide">
+    <div class="eyebrow">Along the way</div>
+    <h2>Three things we found in the data</h2>
+    <div class="grid g3">
+      <div class="card"><span class="k">Trap</span>
+        <p><strong>Zarr arrays are zero-padded to a chunk boundary.</strong> Read them raw and the
+          trailing frames look exactly like a frozen tracker. The gate would have discarded the
+          entire dataset. True length is <span class="mono">total_frames</span> in the group attrs.</p></div>
+      <div class="card"><span class="k">Cost</span>
+        <p><strong>Images are 84.6 GB for this slice; poses are 2.3 GB.</strong> Every signal we use is
+          pose-only, deliberately — a curation engine that costs more than the training it saves
+          is not worth running.</p></div>
+      <div class="card"><span class="k">Comparability</span>
+        <p><strong>An “episode” is not a common unit.</strong> Median 93 s in <span class="mono">rl2</span>
+          vs 6.6 s in <span class="mono">mecka</span> — a factor of 14. Episode-count budgets do not
+          transfer across labs; budget in seconds.</p></div>
+    </div>
+    <p class="cite">Both labs are clean on tracking dropout and frozen trackers — 0.0% each. That is a
+      real finding about EgoVerse, not a null result.</p>
+  </section>
+
+  <!-- 13 -->
+  <section class="slide">
+    <div class="eyebrow">Limitations</div>
+    <h2>The things to attack first</h2>
+    <ul>
+      <li><strong>Avg-MSE is a proxy, not robot success.</strong> It ranks subsets; it does not predict
+        success rate. The EgoVerse authors say the same and use it anyway.</li>
+      <li><strong>The proxy policy is proprioceptive, not visual</strong> — a direct consequence of the
+        84.6 GB figure. A visual policy might rank subsets differently.</li>
+      <li><strong>One task, one lab.</strong> No claim of transfer. The slice was forced by metadata
+        availability, not chosen because it flattered us.</li>
+      <li><strong>Facility location was our a priori pick and it lost</strong> to DPP and k-center.
+        Reported, not quietly reordered so the winner looks like the plan.</li>
+      <li><strong>Small effect, small pool.</strong> ~4% on a few hundred episodes. The positive control
+        is what makes that interpretable rather than decorative.</li>
+    </ul>
+  </section>
+
+  <!-- 14 -->
+  <section class="slide">
+    <div class="eyebrow">See it live</div>
+    <h2>The Curation Manifold</h2>
+    <p class="big">Switch selectors and watch which quarter of the data each one keeps. Hover any
+      dot for the actual episode frame and, if it was dropped, why.</p>
+    <img class="fig" src="__FIG_PAIRED__" alt="Paired differences against random for each selector, on both held-out axes.">
+    <div class="grid g2">
+      <div class="card"><span class="k">Repo</span><p class="mono">github.com/sahilmahendrakar/egoscore</p>
+        <p><span class="mono">bash scripts/run_all.sh</span> reproduces every number.</p></div>
+      <div class="card accent"><span class="k">Interactive demo</span>
+        <p>The manifold, the selectors, the drop reasons — live.</p></div>
+    </div>
+  </section>
+
+</div>
+
+<div id="count"></div>
+<div id="hint">← → to navigate · F for fullscreen</div>
+<nav class="arrows">
+  <button id="prev" aria-label="Previous slide">←</button>
+  <button id="next" aria-label="Next slide">→</button>
+</nav>
+
+<script>
+(function () {
+  "use strict";
+  const slides = Array.from(document.querySelectorAll(".slide"));
+  const bar = document.getElementById("bar");
+  const count = document.getElementById("count");
+  let i = 0;
+
+  function show(n) {
+    i = Math.max(0, Math.min(slides.length - 1, n));
+    slides.forEach((s, k) => s.classList.toggle("on", k === i));
+    bar.style.width = ((i + 1) / slides.length * 100) + "%";
+    count.textContent = (i + 1) + " / " + slides.length;
+    history.replaceState(null, "", "#" + (i + 1));
+    slides[i].scrollTop = 0;
+  }
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowRight" || e.key === "PageDown" || e.key === " ") { e.preventDefault(); show(i + 1); }
+    else if (e.key === "ArrowLeft" || e.key === "PageUp") { e.preventDefault(); show(i - 1); }
+    else if (e.key === "Home") show(0);
+    else if (e.key === "End") show(slides.length - 1);
+    else if (e.key === "f" || e.key === "F") {
+      if (document.fullscreenElement) document.exitFullscreen();
+      else document.documentElement.requestFullscreen?.();
+    }
+  });
+  document.getElementById("next").addEventListener("click", () => show(i + 1));
+  document.getElementById("prev").addEventListener("click", () => show(i - 1));
+
+  const start = parseInt(location.hash.replace("#", ""), 10);
+  show(Number.isFinite(start) && start > 0 ? start - 1 : 0);
+})();
+</script>

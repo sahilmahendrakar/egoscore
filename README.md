@@ -34,7 +34,7 @@ full gated pool still beats every subset. It is:
 > At a quarter of the budget, diversity-aware selection closes **56%** (unseen operator)
 > and **50%** (unseen scene) of the gap between a random quarter and using everything.
 
-🧭 **[Interactive demo — The Curation Manifold](https://claude.ai/code/artifact/0db5ec63-9657-4738-854a-2703290324cc)** · 📄 **[Full validation report](reports/validation.md)**
+🧭 **[Interactive demo — The Curation Manifold](https://claude.ai/code/artifact/0db5ec63-9657-4738-854a-2703290324cc)** · 📊 **[Slide deck](https://claude.ai/code/artifact/f9b606c2-ad6d-488b-ab9f-727c9875e1f8)** · 📄 **[Validation report](reports/validation.md)**
 
 In the demo you can switch selectors and watch which quarter of the data each one keeps.
 `degenerate` visibly clumps into 18 operator×scene groups; `kcenter` spreads across 104.
