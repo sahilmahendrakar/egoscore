@@ -18,9 +18,9 @@ import numpy as np
 
 FPS = 30.0
 
-# Aria gen1 pinhole intrinsics, constant across the rl2 slice (verified in
-# scripts/06_verify_intrinsics.py). Used only to test whether keypoints project
-# inside the image, so small per-episode deviations do not matter.
+# Aria gen1 pinhole intrinsics. Verified constant across the rl2 slice by
+# scripts/12_verify_intrinsics.py (80 episodes sampled, 1 distinct value, exact match).
+# Used only to test whether keypoints project inside the image.
 ARIA_K = np.array([[266.50860444, 0.0, 320.0], [0.0, 266.50860444, 240.0], [0.0, 0.0, 1.0]])
 IMG_W, IMG_H = 640, 480
 

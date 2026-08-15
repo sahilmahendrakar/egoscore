@@ -29,6 +29,9 @@ $PY scripts/02_profile_slice.py
 echo "==> 04: pull pose arrays for rl2 (~10 min, 1.2 GB)"
 $PY scripts/04_pull_poses.py rl2
 
+echo "==> 12: verify camera intrinsics are constant (assumption check)"
+$PY scripts/12_verify_intrinsics.py 80
+
 echo "==> 06: extract quality signals + embedding features"
 $PY scripts/06_extract_features.py
 
