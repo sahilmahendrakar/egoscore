@@ -1,0 +1,496 @@
+<title>The Curation Manifold</title>
+<style>
+  /* ---- tokens: light is the base, both dark scopes redefine only tokens ---- */
+  :root {
+    color-scheme: light;
+    --surface:        #fcfcfb;
+    --surface-sunk:   #f2f2f0;
+    --surface-raised: #ffffff;
+    --line:           #e0e0dc;
+    --line-strong:    #c8c8c2;
+    --ink:            #14161a;
+    --ink-2:          #52514e;
+    --ink-3:          #7c7b76;
+
+    --sel:            #2a78d6;   /* selected episodes */
+    --drop:           #e34948;   /* dropped by the quality gate */
+    --good:           #1baf7a;   /* better than random */
+    --pool:           #bdbdb8;   /* pool, not selected */
+    --pool-faint:     #d8d8d4;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --surface:        #1a1a19;
+      --surface-sunk:   #131312;
+      --surface-raised: #232322;
+      --line:           #33332f;
+      --line-strong:    #4a4a45;
+      --ink:            #f4f4f0;
+      --ink-2:          #c3c2b7;
+      --ink-3:          #918f86;
+
+      --sel:            #3987e5;
+      --drop:           #e66767;
+      --good:           #199e70;
+      --pool:           #57564f;
+      --pool-faint:     #3b3a35;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --surface:        #1a1a19;
+    --surface-sunk:   #131312;
+    --surface-raised: #232322;
+    --line:           #33332f;
+    --line-strong:    #4a4a45;
+    --ink:            #f4f4f0;
+    --ink-2:          #c3c2b7;
+    --ink-3:          #918f86;
+
+    --sel:            #3987e5;
+    --drop:           #e66767;
+    --good:           #199e70;
+    --pool:           #57564f;
+    --pool-faint:     #3b3a35;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--surface);
+    color: var(--ink);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+    font-size: 15px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .mono { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace; }
+
+  .wrap {
+    max-width: 1240px;
+    margin: 0 auto;
+    padding: 40px 24px 64px;
+    display: flex;
+    flex-direction: column;
+    gap: 30px;
+  }
+
+  /* ---- header ---- */
+  header { display: flex; flex-direction: column; gap: 10px; }
+  .eyebrow {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 11.5px; letter-spacing: 0.13em; text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  h1 {
+    margin: 0; font-size: clamp(28px, 4vw, 42px); line-height: 1.1;
+    letter-spacing: -0.022em; font-weight: 640; text-wrap: balance;
+  }
+  .lede { margin: 0; max-width: 68ch; color: var(--ink-2); font-size: 16.5px; }
+
+  /* ---- stat strip ---- */
+  .stats { display: flex; flex-wrap: wrap; gap: 10px; }
+  .stat {
+    flex: 1 1 150px; background: var(--surface-raised);
+    border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px;
+    display: flex; flex-direction: column; gap: 2px;
+  }
+  .stat .k {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-3);
+  }
+  .stat .v {
+    font-size: 25px; font-weight: 620; letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+  }
+  .stat .sub { font-size: 12.5px; color: var(--ink-3); }
+
+  /* ---- main panel ---- */
+  .panel {
+    display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(260px, 0.95fr);
+    gap: 22px; align-items: start;
+  }
+  @media (max-width: 860px) { .panel { grid-template-columns: minmax(0, 1fr); } }
+
+  .plotcard {
+    background: var(--surface-raised); border: 1px solid var(--line);
+    border-radius: 10px; padding: 16px 16px 12px; position: relative;
+  }
+  .cardhead { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 4px; }
+  .cardtitle { font-size: 14.5px; font-weight: 620; letter-spacing: -0.008em; }
+  .cardnote { font-size: 12px; color: var(--ink-3); }
+
+  canvas { display: block; width: 100%; height: auto; touch-action: none; cursor: crosshair; }
+
+  /* ---- legend ---- */
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 10px; font-size: 12.5px; color: var(--ink-2); }
+  .lg { display: inline-flex; align-items: center; gap: 6px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  .dot.ring { background: transparent; border: 2px solid var(--drop); }
+
+  /* ---- controls ---- */
+  .side { display: flex; flex-direction: column; gap: 16px; }
+  .ctrl {
+    background: var(--surface-raised); border: 1px solid var(--line);
+    border-radius: 10px; padding: 14px;
+  }
+  .ctrl h2 {
+    margin: 0 0 10px; font-size: 11.5px; letter-spacing: 0.11em;
+    text-transform: uppercase; color: var(--ink-3); font-weight: 620;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  .btns { display: flex; flex-direction: column; gap: 6px; }
+  button.sel {
+    appearance: none; text-align: left; cursor: pointer;
+    background: var(--surface-sunk); color: var(--ink);
+    border: 1px solid var(--line); border-radius: 7px;
+    padding: 9px 11px; font: inherit; font-size: 13.5px;
+    display: flex; justify-content: space-between; align-items: center; gap: 10px;
+    transition: border-color .12s, background .12s;
+  }
+  button.sel:hover { border-color: var(--line-strong); }
+  button.sel:focus-visible { outline: 2px solid var(--sel); outline-offset: 2px; }
+  button.sel[aria-pressed="true"] {
+    background: color-mix(in srgb, var(--sel) 12%, var(--surface-raised));
+    border-color: var(--sel);
+  }
+  button.sel .tag {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 11px; color: var(--ink-3); font-variant-numeric: tabular-nums;
+  }
+  button.sel[aria-pressed="true"] .tag { color: var(--ink-2); }
+  .ctrlnote { margin: 9px 0 0; font-size: 12px; color: var(--ink-3); line-height: 1.45; }
+
+  label.check { display: flex; align-items: center; gap: 8px; font-size: 13.5px; cursor: pointer; }
+  label.check input { accent-color: var(--sel); width: 15px; height: 15px; }
+
+  /* ---- readout ---- */
+  .readout { display: flex; flex-direction: column; gap: 9px; }
+  .row { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 13.5px; }
+  .row .lab { color: var(--ink-2); }
+  .row .val { font-variant-numeric: tabular-nums; font-weight: 600;
+              font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+  /* ---- delta bars ---- */
+  .bars { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+  .bar { display: grid; grid-template-columns: 96px 1fr 64px; align-items: center; gap: 10px; font-size: 13px; }
+  .bar .name { color: var(--ink-2); }
+  .bar .name.cur { color: var(--ink); font-weight: 620; }
+  .track { position: relative; height: 20px; background: var(--surface-sunk);
+           border-radius: 4px; overflow: hidden; }
+  .zero { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--line-strong); }
+  .fill { position: absolute; top: 3px; bottom: 3px; border-radius: 3px; }
+  .bar .num { text-align: right; font-variant-numeric: tabular-nums;
+              font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
+
+  /* ---- tooltip ---- */
+  #tip {
+    position: fixed; z-index: 40; pointer-events: none; opacity: 0;
+    transition: opacity .09s; background: var(--surface-raised);
+    border: 1px solid var(--line-strong); border-radius: 9px;
+    padding: 9px; width: 186px; box-shadow: 0 8px 26px rgba(0,0,0,.17);
+  }
+  #tip img { display: block; width: 100%; border-radius: 5px; background: var(--surface-sunk); }
+  #tip .tl { margin-top: 7px; display: flex; flex-direction: column; gap: 2px;
+             font-size: 11.5px; color: var(--ink-2);
+             font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  #tip .why { color: var(--drop); font-weight: 600; }
+  #tip .st { color: var(--sel); font-weight: 600; }
+
+  /* ---- footer ---- */
+  footer { border-top: 1px solid var(--line); padding-top: 18px;
+           display: flex; flex-direction: column; gap: 10px; }
+  footer p { margin: 0; font-size: 13px; color: var(--ink-2); max-width: 88ch; }
+  footer .cap { color: var(--ink-3); font-size: 12.5px; }
+  a { color: var(--sel); }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; }
+  }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">EgoVerse · Track 1 · The Curation Engine</div>
+    <h1>The Curation Manifold</h1>
+    <p class="lede">
+      Every dot is one <span class="mono">fold_clothes</span> episode from the EgoVerse
+      <span class="mono">rl2</span> slice, placed by what the hands actually did. Pick a
+      selector and watch which quarter of the data it keeps — then read what that choice
+      cost on the held-out policy metric.
+    </p>
+  </header>
+
+  <div class="stats" id="stats"></div>
+
+  <div class="panel">
+    <div class="plotcard">
+      <div class="cardhead">
+        <div class="cardtitle">Episode embedding <span class="cardnote">— 41 trajectory features → t-SNE</span></div>
+        <div class="cardnote" id="plotcount"></div>
+      </div>
+      <canvas id="plot" width="1300" height="960" aria-label="Scatter plot of episodes; selected episodes highlighted"></canvas>
+      <div class="legend">
+        <span class="lg"><i class="dot" style="background:var(--sel)"></i>selected</span>
+        <span class="lg"><i class="dot" style="background:var(--pool)"></i>pool, not selected</span>
+        <span class="lg"><i class="dot ring"></i>dropped by quality gate</span>
+      </div>
+      <p class="cardnote" style="margin:8px 0 0">
+        Axes carry no units — t-SNE preserves neighbourhoods, not distances or direction.
+        Read clustering, not position.
+      </p>
+    </div>
+
+    <div class="side">
+      <div class="ctrl">
+        <h2>Selector</h2>
+        <div class="btns" id="btns"></div>
+        <p class="ctrlnote">
+          Each keeps the same number of episodes. Only <em>which</em> ones changes.
+        </p>
+      </div>
+
+      <div class="ctrl">
+        <h2>Readout</h2>
+        <div class="readout" id="readout"></div>
+      </div>
+
+      <div class="ctrl">
+        <h2>Avg-MSE vs random</h2>
+        <div class="bars" id="bars"></div>
+        <p class="ctrlnote">
+          Held-out unseen operators at the 25% budget, mean over 10 seeds.
+          Left of the line is better.
+        </p>
+      </div>
+
+      <div class="ctrl">
+        <label class="check">
+          <input type="checkbox" id="showdrop" checked>
+          Ring the episodes the quality gate dropped
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <p>
+      <strong>What you are looking at.</strong> <span class="mono">degenerate</span> is a
+      deliberate positive control: it spends the identical budget but concentrates it into a
+      handful of operator×scene groups. You can see it clump, and it costs +7.2% Avg-MSE.
+      That is how we know the harness detects a real diversity effect rather than noise —
+      and therefore that the smaller margins above are measurements, not luck.
+    </p>
+    <p class="cap">
+      Avg-MSE is an offline proxy, not robot success — the EgoVerse authors use it on the same
+      terms. One task, one lab; no claim of transfer. Full method, statistics and limitations in the
+      <a href="https://github.com/sahilmahendrakar/egoscore">repo</a>.
+    </p>
+  </footer>
+</div>
+
+<div id="tip" role="tooltip"></div>
+
+<script id="payload" type="application/json">__DATA__</script>
+<script>
+(function () {
+  "use strict";
+  const D = JSON.parse(document.getElementById("payload").textContent);
+  const EPS = D.episodes;
+  const ORDER = ["random", "curated", "dpp", "kcenter", "degenerate"];
+  const LABEL = {
+    random: "random", curated: "facility loc.", dpp: "dpp (log-det)",
+    kcenter: "k-center", degenerate: "degenerate"
+  };
+  // Deep-linkable so a demo can jump straight to a selector: #degenerate
+  const fromHash = location.hash.replace("#", "");
+  let current = ORDER.includes(fromHash) ? fromHash : "dpp";
+  let showDrops = true;
+
+  const cv = document.getElementById("plot");
+  const ctx = cv.getContext("2d");
+  const tip = document.getElementById("tip");
+  const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+  // --- geometry -----------------------------------------------------------
+  let pts = [];
+  function layout() {
+    const pad = 34;
+    const W = cv.width, H = cv.height;
+    const xs = EPS.map(e => e.x), ys = EPS.map(e => e.y);
+    const x0 = Math.min(...xs), x1 = Math.max(...xs);
+    const y0 = Math.min(...ys), y1 = Math.max(...ys);
+    const sx = (W - 2 * pad) / (x1 - x0 || 1);
+    const sy = (H - 2 * pad) / (y1 - y0 || 1);
+    const s = Math.min(sx, sy);
+    const ox = (W - (x1 - x0) * s) / 2, oy = (H - (y1 - y0) * s) / 2;
+    pts = EPS.map(e => ({ px: (e.x - x0) * s + ox, py: (e.y - y0) * s + oy }));
+  }
+
+  function selectedSet() {
+    return new Set(D.selections[current].idx);
+  }
+
+  function draw() {
+    const S = selectedSet();
+    const surf = css("--surface-raised");
+    ctx.clearRect(0, 0, cv.width, cv.height);
+
+    // Unselected pool first, so selected marks sit on top.
+    for (let i = 0; i < EPS.length; i++) {
+      if (S.has(i)) continue;
+      const p = pts[i];
+      ctx.beginPath();
+      ctx.arc(p.px, p.py, 4.2, 0, 6.2832);
+      ctx.fillStyle = EPS[i].keep ? css("--pool") : css("--pool-faint");
+      ctx.fill();
+    }
+    // Selected: 2px surface ring so overlapping marks stay separable.
+    for (let i = 0; i < EPS.length; i++) {
+      if (!S.has(i)) continue;
+      const p = pts[i];
+      ctx.beginPath();
+      ctx.arc(p.px, p.py, 5.6, 0, 6.2832);
+      ctx.fillStyle = css("--sel");
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = surf;
+      ctx.stroke();
+    }
+    // Gate drops carry a ring, not a fill — they are never selectable.
+    if (showDrops) {
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = css("--drop");
+      for (let i = 0; i < EPS.length; i++) {
+        if (EPS[i].keep) continue;
+        const p = pts[i];
+        ctx.beginPath();
+        ctx.arc(p.px, p.py, 6.4, 0, 6.2832);
+        ctx.stroke();
+      }
+    }
+  }
+
+  // --- side panels --------------------------------------------------------
+  function renderStats() {
+    const S = D.selections[current];
+    const m = D.mse[current] || {};
+    const pct = m.pct_op;
+    document.getElementById("stats").innerHTML = [
+      ["Episodes in slice", D.n_total, "rl2 · fold_clothes"],
+      ["Kept by the gate", D.n_pool, D.n_dropped + " dropped"],
+      ["Selected", D.k, Math.round(100 * D.k_frac) + "% budget"],
+      ["Groups covered", S.n_groups, "of 190 operator×scene"],
+      ["Avg-MSE vs random", (pct === undefined ? "—" : (pct > 0 ? "+" : "") + pct.toFixed(2) + "%"),
+       "unseen operators"]
+    ].map(([k, v, s]) =>
+      `<div class="stat"><span class="k">${k}</span><span class="v">${v}</span><span class="sub">${s}</span></div>`
+    ).join("");
+    document.getElementById("plotcount").textContent =
+      D.k + " of " + D.n_pool + " shown selected";
+  }
+
+  function renderButtons() {
+    document.getElementById("btns").innerHTML = ORDER.map(c =>
+      `<button class="sel" data-c="${c}" aria-pressed="${c === current}">
+         <span>${LABEL[c]}</span>
+         <span class="tag">${D.selections[c].n_groups} grp</span>
+       </button>`).join("");
+    document.querySelectorAll("button.sel").forEach(b =>
+      b.addEventListener("click", () => {
+        current = b.dataset.c;
+        history.replaceState(null, "", "#" + current);
+        renderAll();
+      }));
+  }
+
+  function renderReadout() {
+    const S = D.selections[current];
+    const m = D.mse[current] || {};
+    const rows = [
+      ["episodes kept", D.k],
+      ["operator×scene groups", S.n_groups],
+      ["Avg-MSE, unseen operator", m.op === undefined ? "—" : m.op.toFixed(5)],
+      ["Avg-MSE, unseen scene", m.scene === undefined ? "—" : m.scene.toFixed(5)]
+    ];
+    document.getElementById("readout").innerHTML = rows.map(([l, v]) =>
+      `<div class="row"><span class="lab">${l}</span><span class="val">${v}</span></div>`).join("");
+  }
+
+  function renderBars() {
+    const vals = ORDER.map(c => (D.mse[c] || {}).pct_op).filter(v => v !== undefined);
+    const span = Math.max(...vals.map(Math.abs), 1) * 1.15;
+    document.getElementById("bars").innerHTML = ORDER.map(c => {
+      const p = (D.mse[c] || {}).pct_op;
+      if (p === undefined) return "";
+      const half = 50 / span;                       // % of track per unit
+      const w = Math.abs(p) * half;
+      const left = p < 0 ? 50 - w : 50;
+      const color = p < 0 ? "var(--good)" : "var(--drop)";
+      const cur = c === current ? " cur" : "";
+      return `<div class="bar">
+        <span class="name${cur}">${LABEL[c]}</span>
+        <span class="track"><span class="zero" style="left:50%"></span>
+          <span class="fill" style="left:${left}%;width:${w}%;background:${color}"></span></span>
+        <span class="num">${p > 0 ? "+" : ""}${p.toFixed(2)}%</span>
+      </div>`;
+    }).join("");
+  }
+
+  function renderAll() {
+    renderStats(); renderButtons(); renderReadout(); renderBars(); draw();
+  }
+
+  // --- hover --------------------------------------------------------------
+  function nearest(mx, my) {
+    let best = -1, bd = 18 * 18;
+    for (let i = 0; i < pts.length; i++) {
+      const dx = pts[i].px - mx, dy = pts[i].py - my;
+      const d = dx * dx + dy * dy;
+      if (d < bd) { bd = d; best = i; }
+    }
+    return best;
+  }
+
+  cv.addEventListener("pointermove", (ev) => {
+    const r = cv.getBoundingClientRect();
+    const mx = (ev.clientX - r.left) * (cv.width / r.width);
+    const my = (ev.clientY - r.top) * (cv.height / r.height);
+    const i = nearest(mx, my);
+    if (i < 0) { tip.style.opacity = 0; return; }
+    const e = EPS[i];
+    const S = selectedSet();
+    tip.innerHTML =
+      (e.t ? `<img src="${e.t}" alt="">` : "") +
+      `<div class="tl">
+         <span>${D.operators[e.op].slice(0, 12)} · scene ${D.scenes[e.sc] || "—"}</span>
+         <span>${e.dur.toFixed(0)}s · ${(e.oof * 100).toFixed(1)}% hand off-frame</span>
+         ${!e.keep ? `<span class="why">dropped: ${e.why}</span>`
+                   : (S.has(i) ? `<span class="st">selected</span>` : `<span>in pool</span>`)}
+       </div>`;
+    tip.style.opacity = 1;
+    const tw = 200, th = 190;
+    let lx = ev.clientX + 16, ly = ev.clientY + 16;
+    if (lx + tw > innerWidth) lx = ev.clientX - tw;
+    if (ly + th > innerHeight) ly = ev.clientY - th;
+    tip.style.left = lx + "px";
+    tip.style.top = ly + "px";
+  });
+  cv.addEventListener("pointerleave", () => { tip.style.opacity = 0; });
+
+  document.getElementById("showdrop").addEventListener("change", (e) => {
+    showDrops = e.target.checked; draw();
+  });
+
+  // Repaint on theme flips so canvas colors follow the tokens.
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", draw);
+  new MutationObserver(draw).observe(document.documentElement,
+    { attributes: true, attributeFilter: ["data-theme"] });
+
+  layout();
+  renderAll();
+})();
+</script>

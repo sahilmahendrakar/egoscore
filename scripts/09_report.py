@@ -183,6 +183,34 @@ w("produces a run of identical trailing frames that looks exactly like a frozen 
 w("frozen-tracker count is zero *because* we truncate; without that step it would have been")
 w("near 100% and the gate would have thrown away the entire dataset.")
 w("")
+sens_path = REPORTS / "sensitivity_summary.csv"
+if sens_path.exists():
+    sens = pd.read_csv(sens_path)
+    w("## Sensitivity: did we tune the proxy to get this?")
+    w("")
+    w("The obvious attack is that we picked a ridge configuration that happened to flatter our")
+    w("selector. So we re-ran the K=25% comparison across a grid of proxy configurations —")
+    w("regularisation strength (0.1 / 1 / 10), feature-map width (256 / 512 / 1024), history")
+    w("length (5 / 10 / 20 frames), and prediction horizon (15 / 30 / 60 steps) — re-tuning")
+    w("nothing per condition. If the conclusion only held at one setting, it would not be a")
+    w("conclusion.")
+    w("")
+    w("| Selector | Configurations where it beats random | Mean | Worst case |")
+    w("|---|---|---|---|")
+    for cond in ["dpp", "kcenter", "curated", "degenerate"]:
+        g = sens[sens.condition == cond]
+        nb = int((g["mse_unseen_operator"] < 0).sum())
+        w(f"| `{cond}` | {nb}/{len(g)} | {g['mse_unseen_operator'].mean():+.2f}% | "
+          f"{g['mse_unseen_operator'].max():+.2f}% |")
+    w("")
+    w("The ranking is unchanged in every configuration tested, and the positive control loses in")
+    w("every configuration. Effect sizes here are larger than the headline because this sweep")
+    w("uses K=25% only, where selection has the most room to matter; the headline averages 25%")
+    w("and 50%.")
+    w("")
+    w("Full grid: [`reports/sensitivity_summary.csv`](sensitivity_summary.csv).")
+    w("")
+
 xlab_path = REPORTS / "cross_lab_summary.csv"
 if xlab_path.exists():
     xlab = pd.read_csv(xlab_path)

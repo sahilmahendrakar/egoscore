@@ -55,3 +55,11 @@ $PY scripts/11_slide.py
 
 echo
 echo "Done. See reports/validation.md and reports/egoscore_summary_slide.png"
+
+echo "==> 13: proxy-hyperparameter sensitivity sweep"
+$PY scripts/13_sensitivity.py
+
+echo "==> 14/15/16: demo thumbnails, projection, and self-contained demo page"
+$PY scripts/14_fetch_thumbs.py
+$PY scripts/15_demo_data.py
+$PY scripts/16_build_demo.py
