@@ -53,9 +53,6 @@ $PY scripts/09_report.py
 echo "==> 11: build the summary slide"
 $PY scripts/11_slide.py
 
-echo
-echo "Done. See reports/validation.md and reports/egoscore_summary_slide.png"
-
 echo "==> 13: proxy-hyperparameter sensitivity sweep"
 $PY scripts/13_sensitivity.py
 
@@ -63,3 +60,9 @@ echo "==> 14/15/16: demo thumbnails, projection, and self-contained demo page"
 $PY scripts/14_fetch_thumbs.py
 $PY scripts/15_demo_data.py
 $PY scripts/16_build_demo.py
+
+echo
+echo "Done."
+echo "  report : reports/validation.md"
+echo "  slide  : reports/egoscore_summary_slide.png"
+echo "  demo   : demo/egoscore_demo.html"
