@@ -20,16 +20,24 @@ from egoscore.access import load_creds, r2_fs
 
 ROOT = Path(__file__).resolve().parent.parent
 REPORTS = ROOT / "reports"
-OUT = ROOT / "data" / "thumbs"
+LAB = sys.argv[1] if len(sys.argv) > 1 else "rl2"
+LIMIT = int(sys.argv[2]) if len(sys.argv) > 2 else 0
+
+OUT = ROOT / "data" / ("thumbs" if LAB == "rl2" else f"thumbs_{LAB}")
 OUT.mkdir(parents=True, exist_ok=True)
 
 THUMB_W = 128
 JPEG_Q = 62
 
 df = pd.read_csv(REPORTS / "slice_fold_clothes.csv")
-rl2 = df[(df["lab"] == "rl2") & (df["embodiment"] == "human_bimanual")]
+rl2 = df[(df["lab"] == LAB) & (df["embodiment"] == "human_bimanual")]
 rl2 = rl2[rl2["zarr_processed_path"].fillna("").str.strip() != ""].reset_index(drop=True)
-print(f"fetching thumbnails for {len(rl2)} episodes")
+if LIMIT and len(rl2) > LIMIT:
+    rl2 = rl2.sample(n=LIMIT, random_state=0).reset_index(drop=True)
+# Only fetch thumbs for episodes we actually pulled poses for.
+have = {p.stem for p in (ROOT / "data" / ("poses" if LAB == "rl2" else f"poses_{LAB}")).glob("*.npz")}
+rl2 = rl2[rl2["episode_hash"].isin(have)].reset_index(drop=True)
+print(f"fetching thumbnails for {len(rl2)} {LAB} episodes")
 
 creds = load_creds()
 fs = r2_fs(creds)

@@ -91,6 +91,26 @@
   }
   .lede { margin: 0; max-width: 68ch; color: var(--ink-2); font-size: 16.5px; }
 
+  /* ---- dataset tabs ---- */
+  .tabs { display: flex; flex-wrap: wrap; gap: 8px; }
+  button.tab {
+    appearance: none; cursor: pointer; font: inherit; font-size: 13.5px;
+    background: var(--surface-raised); color: var(--ink-2);
+    border: 1px solid var(--line); border-radius: 8px; padding: 8px 13px;
+    display: flex; align-items: baseline; gap: 8px;
+    transition: border-color .12s, background .12s, color .12s;
+  }
+  button.tab:hover { border-color: var(--line-strong); color: var(--ink); }
+  button.tab:focus-visible { outline: 2px solid var(--sel); outline-offset: 2px; }
+  button.tab[aria-pressed="true"] {
+    background: color-mix(in srgb, var(--sel) 12%, var(--surface-raised));
+    border-color: var(--sel); color: var(--ink); font-weight: 620;
+  }
+  button.tab .sub {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 11px; color: var(--ink-3); font-variant-numeric: tabular-nums;
+  }
+
   /* ---- stat strip ---- */
   .stats { display: flex; flex-wrap: wrap; gap: 10px; }
   .stat {
@@ -216,12 +236,8 @@
   <header>
     <div class="eyebrow">EgoVerse · Track 1 · The Curation Engine</div>
     <h1>The Curation Manifold</h1>
-    <p class="lede">
-      Every dot is one <span class="mono">fold_clothes</span> episode from the EgoVerse
-      <span class="mono">rl2</span> slice, placed by what the hands actually did. Pick a
-      selector and watch which quarter of the data it keeps — then read what that choice
-      cost on the held-out policy metric.
-    </p>
+    <p class="lede" id="lede"></p>
+    <div class="tabs" id="tabs"></div>
   </header>
 
   <div class="stats" id="stats"></div>
@@ -234,8 +250,8 @@
       </div>
       <canvas id="plot" width="1300" height="960" aria-label="Scatter plot of episodes; selected episodes highlighted"></canvas>
       <div class="legend">
-        <span class="lg"><i class="dot" style="background:var(--sel)"></i>selected</span>
-        <span class="lg"><i class="dot" style="background:var(--pool)"></i>pool, not selected</span>
+        <span class="lg" id="lg-sel"><i class="dot" style="background:var(--sel)"></i>selected</span>
+        <span class="lg" id="lg-pool"><i class="dot" style="background:var(--pool)"></i>pool, not selected</span>
         <span class="lg"><i class="dot ring"></i>dropped by quality gate</span>
       </div>
       <p class="cardnote" style="margin:8px 0 0">
@@ -245,7 +261,7 @@
     </div>
 
     <div class="side">
-      <div class="ctrl">
+      <div class="ctrl" id="selcard">
         <h2>Selector</h2>
         <div class="btns" id="btns"></div>
         <p class="ctrlnote">
@@ -258,7 +274,7 @@
         <div class="readout" id="readout"></div>
       </div>
 
-      <div class="ctrl">
+      <div class="ctrl" id="barcard">
         <h2>Avg-MSE vs random</h2>
         <div class="bars" id="bars"></div>
         <p class="ctrlnote">
@@ -272,18 +288,13 @@
           <input type="checkbox" id="showdrop" checked>
           Ring the episodes the quality gate dropped
         </label>
+        <p class="ctrlnote" id="dropnote"></p>
       </div>
     </div>
   </div>
 
   <footer>
-    <p>
-      <strong>What you are looking at.</strong> <span class="mono">degenerate</span> is a
-      deliberate positive control: it spends the identical budget but concentrates it into a
-      handful of operator×scene groups. You can see it clump, and it costs +7.2% Avg-MSE.
-      That is how we know the harness detects a real diversity effect rather than noise —
-      and therefore that the smaller margins above are measurements, not luck.
-    </p>
+    <p id="foot"></p>
     <p class="cap">
       Avg-MSE is an offline proxy, not robot success — the EgoVerse authors use it on the same
       terms. One task, one lab; no claim of transfer. Full method, statistics and limitations in the
@@ -298,16 +309,44 @@
 <script>
 (function () {
   "use strict";
-  const D = JSON.parse(document.getElementById("payload").textContent);
-  const EPS = D.episodes;
+  const PAYLOAD = JSON.parse(document.getElementById("payload").textContent);
   const ORDER = ["random", "curated", "dpp", "kcenter", "degenerate"];
   const LABEL = {
     random: "random", curated: "facility loc.", dpp: "dpp (log-det)",
     kcenter: "k-center", degenerate: "degenerate"
   };
-  // Deep-linkable so a demo can jump straight to a selector: #degenerate
-  const fromHash = location.hash.replace("#", "");
-  let current = ORDER.includes(fromHash) ? fromHash : "dpp";
+  const META = {
+    rl2: {
+      name: "rl2",
+      blurb: "572 episodes with a full operator × scene grid — the only slice where the " +
+             "selection experiment can run. Pick a selector and watch which quarter of the data " +
+             "it keeps, then read what that choice cost on held-out episodes.",
+      note: "Barely anything to ring here. This lab is clean: 1 episode in 572.",
+      foot: "<strong>What you are looking at.</strong> <span class='mono'>degenerate</span> is a " +
+            "deliberate control: it spends the identical budget but concentrates it into about 21 " +
+            "operator×scene groups instead of about 73. You can watch it clump, and it costs +7.0% " +
+            "Avg-MSE. That is how we know the measurement detects a real diversity effect rather " +
+            "than noise, and therefore that the smaller margins are measurements rather than luck."
+    },
+    microagi: {
+      name: "microagi",
+      blurb: "1,200 episodes sampled from the largest fold_clothes slice. It has no operator or " +
+             "scene labels, so no selection experiment is possible — but this is where the " +
+             "quality gate actually does something. Hover a ringed dot to see why it went.",
+      note: "Every ringed dot ran more than 3× this lab's median episode length.",
+      foot: "<strong>What you are looking at.</strong> 167 of 1,200 episodes ran more than three " +
+            "times this lab's median length of 10.6s — the longest is 797s. Hover one: the frame " +
+            "is mid-way through what is really a whole folding session, labelled as a single " +
+            "demonstration. Notice they cluster together on the left-to-right axis, so this is a " +
+            "property the trajectory features pick up on their own, not just a duration cut."
+    }
+  };
+  const IDS = Object.keys(PAYLOAD.datasets);
+
+  let dsId = location.hash.replace("#", "");
+  if (!PAYLOAD.datasets[dsId]) dsId = IDS[0];
+  let D = PAYLOAD.datasets[dsId];
+  let current = "dpp";
   let showDrops = true;
 
   const cv = document.getElementById("plot");
@@ -315,145 +354,167 @@
   const tip = document.getElementById("tip");
   const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 
-  // --- geometry -----------------------------------------------------------
   let pts = [];
   function layout() {
-    const pad = 34;
-    const W = cv.width, H = cv.height;
-    const xs = EPS.map(e => e.x), ys = EPS.map(e => e.y);
+    const pad = 34, W = cv.width, H = cv.height, E = D.episodes;
+    const xs = E.map(e => e.x), ys = E.map(e => e.y);
     const x0 = Math.min(...xs), x1 = Math.max(...xs);
     const y0 = Math.min(...ys), y1 = Math.max(...ys);
-    const sx = (W - 2 * pad) / (x1 - x0 || 1);
-    const sy = (H - 2 * pad) / (y1 - y0 || 1);
-    const s = Math.min(sx, sy);
-    const ox = (W - (x1 - x0) * s) / 2, oy = (H - (y1 - y0) * s) / 2;
-    pts = EPS.map(e => ({ px: (e.x - x0) * s + ox, py: (e.y - y0) * s + oy }));
+    const sc = Math.min((W - 2 * pad) / (x1 - x0 || 1), (H - 2 * pad) / (y1 - y0 || 1));
+    const ox = (W - (x1 - x0) * sc) / 2, oy = (H - (y1 - y0) * sc) / 2;
+    pts = E.map(e => ({ px: (e.x - x0) * sc + ox, py: (e.y - y0) * sc + oy }));
   }
 
-  function selectedSet() {
-    return new Set(D.selections[current].idx);
-  }
+  const hasSel = () => !!D.with_selection;
+  const selectedSet = () => hasSel() ? new Set(D.selections[current].idx) : new Set();
 
   function draw() {
-    const S = selectedSet();
-    const surf = css("--surface-raised");
+    const S = selectedSet(), surf = css("--surface-raised");
+    const many = D.episodes.length > 700;
+    const rPool = many ? 3.0 : 4.2, rSel = many ? 4.4 : 5.6, rRing = many ? 4.8 : 6.4;
     ctx.clearRect(0, 0, cv.width, cv.height);
-
-    // Unselected pool first, so selected marks sit on top.
-    for (let i = 0; i < EPS.length; i++) {
+    for (let i = 0; i < D.episodes.length; i++) {
       if (S.has(i)) continue;
       const p = pts[i];
-      ctx.beginPath();
-      ctx.arc(p.px, p.py, 4.2, 0, 6.2832);
-      ctx.fillStyle = EPS[i].keep ? css("--pool") : css("--pool-faint");
+      ctx.beginPath(); ctx.arc(p.px, p.py, rPool, 0, 6.2832);
+      ctx.fillStyle = D.episodes[i].keep ? css("--pool") : css("--pool-faint");
       ctx.fill();
     }
-    // Selected: 2px surface ring so overlapping marks stay separable.
-    for (let i = 0; i < EPS.length; i++) {
+    for (let i = 0; i < D.episodes.length; i++) {
       if (!S.has(i)) continue;
       const p = pts[i];
-      ctx.beginPath();
-      ctx.arc(p.px, p.py, 5.6, 0, 6.2832);
-      ctx.fillStyle = css("--sel");
-      ctx.fill();
-      ctx.lineWidth = 2;
-      ctx.strokeStyle = surf;
-      ctx.stroke();
+      ctx.beginPath(); ctx.arc(p.px, p.py, rSel, 0, 6.2832);
+      ctx.fillStyle = css("--sel"); ctx.fill();
+      ctx.lineWidth = 2; ctx.strokeStyle = surf; ctx.stroke();
     }
-    // Gate drops carry a ring, not a fill — they are never selectable.
     if (showDrops) {
-      ctx.lineWidth = 2;
-      ctx.strokeStyle = css("--drop");
-      for (let i = 0; i < EPS.length; i++) {
-        if (EPS[i].keep) continue;
+      ctx.lineWidth = 2; ctx.strokeStyle = css("--drop");
+      for (let i = 0; i < D.episodes.length; i++) {
+        if (D.episodes[i].keep) continue;
         const p = pts[i];
-        ctx.beginPath();
-        ctx.arc(p.px, p.py, 6.4, 0, 6.2832);
-        ctx.stroke();
+        ctx.beginPath(); ctx.arc(p.px, p.py, rRing, 0, 6.2832); ctx.stroke();
       }
     }
   }
 
-  // --- side panels --------------------------------------------------------
+  function renderTabs() {
+    document.getElementById("tabs").innerHTML = IDS.map(id => {
+      const d = PAYLOAD.datasets[id];
+      const pct = (100 * d.n_dropped / d.n_total).toFixed(1);
+      return '<button class="tab" data-d="' + id + '" aria-pressed="' + (id === dsId) + '">' +
+             '<span>' + (META[id] ? META[id].name : id) + '</span>' +
+             '<span class="sub">' + d.n_total + ' eps · ' + d.n_dropped +
+             ' dropped (' + pct + '%)</span></button>';
+    }).join("");
+    document.querySelectorAll("button.tab").forEach(b =>
+      b.addEventListener("click", () => {
+        dsId = b.dataset.d; D = PAYLOAD.datasets[dsId];
+        history.replaceState(null, "", "#" + dsId);
+        layout(); renderAll();
+      }));
+    const m = META[dsId] || { blurb: "", note: "", foot: "" };
+    document.getElementById("lede").textContent = m.blurb;
+    document.getElementById("dropnote").textContent = m.note;
+    document.getElementById("foot").innerHTML = m.foot || "";
+    document.getElementById("lg-sel").style.display = hasSel() ? "" : "none";
+    document.getElementById("lg-pool").firstChild.nextSibling.textContent =
+      hasSel() ? "pool, not selected" : "kept by the gate";
+  }
+
   function renderStats() {
-    const S = D.selections[current];
-    const m = D.mse[current] || {};
-    const pct = m.pct_op;
-    document.getElementById("stats").innerHTML = [
-      ["Episodes in slice", D.n_total, "rl2 · fold_clothes"],
-      ["Kept by the gate", D.n_pool, D.n_dropped + " dropped"],
-      ["Selected", D.k, Math.round(100 * D.k_frac) + "% budget"],
-      ["Groups covered", S.n_groups, "of 190 operator×scene"],
-      ["Avg-MSE vs random", (pct === undefined ? "—" : (pct > 0 ? "+" : "") + pct.toFixed(2) + "%"),
-       "unseen operators"]
-    ].map(([k, v, s]) =>
-      `<div class="stat"><span class="k">${k}</span><span class="v">${v}</span><span class="sub">${s}</span></div>`
-    ).join("");
-    document.getElementById("plotcount").textContent =
-      D.k + " of " + D.n_pool + " shown selected";
+    const rows = [
+      ["Episodes shown", D.n_total, dsId + " · fold_clothes"],
+      ["Dropped by the gate", D.n_dropped,
+       (100 * D.n_dropped / D.n_total).toFixed(1) + "% · median " + D.median_dur + "s"]
+    ];
+    if (hasSel()) {
+      const S = D.selections[current], m = D.mse[current] || {};
+      rows.push(["Selected", D.k, Math.round(100 * D.k_frac) + "% budget"]);
+      rows.push(["Groups covered", S.n_groups, "operator×scene"]);
+      rows.push(["Avg-MSE vs random",
+        m.pct_op === undefined ? "—" : (m.pct_op > 0 ? "+" : "") + m.pct_op.toFixed(2) + "%",
+        "unseen operators"]);
+    } else {
+      rows.push(["Selection experiment", "n/a", "no operator or scene labels"]);
+    }
+    document.getElementById("stats").innerHTML = rows.map(r =>
+      '<div class="stat"><span class="k">' + r[0] + '</span><span class="v">' + r[1] +
+      '</span><span class="sub">' + r[2] + '</span></div>').join("");
+    document.getElementById("plotcount").textContent = hasSel()
+      ? D.k + " of " + D.n_pool + " shown selected"
+      : D.n_dropped + " of " + D.n_total + " ringed as drops";
   }
 
   function renderButtons() {
+    const card = document.getElementById("selcard"), bars = document.getElementById("barcard");
+    card.style.display = hasSel() ? "" : "none";
+    bars.style.display = hasSel() ? "" : "none";
+    if (!hasSel()) return;
     document.getElementById("btns").innerHTML = ORDER.map(c =>
-      `<button class="sel" data-c="${c}" aria-pressed="${c === current}">
-         <span>${LABEL[c]}</span>
-         <span class="tag">${D.selections[c].n_groups} grp</span>
-       </button>`).join("");
+      '<button class="sel" data-c="' + c + '" aria-pressed="' + (c === current) + '">' +
+      '<span>' + LABEL[c] + '</span><span class="tag">' + D.selections[c].n_groups +
+      ' grp</span></button>').join("");
     document.querySelectorAll("button.sel").forEach(b =>
-      b.addEventListener("click", () => {
-        current = b.dataset.c;
-        history.replaceState(null, "", "#" + current);
-        renderAll();
-      }));
+      b.addEventListener("click", () => { current = b.dataset.c; renderAll(); }));
   }
 
   function renderReadout() {
-    const S = D.selections[current];
-    const m = D.mse[current] || {};
-    const rows = [
-      ["episodes kept", D.k],
-      ["operator×scene groups", S.n_groups],
-      ["Avg-MSE, unseen operator", m.op === undefined ? "—" : m.op.toFixed(5)],
-      ["Avg-MSE, unseen scene", m.scene === undefined ? "—" : m.scene.toFixed(5)]
-    ];
-    document.getElementById("readout").innerHTML = rows.map(([l, v]) =>
-      `<div class="row"><span class="lab">${l}</span><span class="val">${v}</span></div>`).join("");
+    let rows;
+    if (hasSel()) {
+      const S = D.selections[current], m = D.mse[current] || {};
+      rows = [["episodes kept", D.k], ["operator×scene groups", S.n_groups],
+              ["Avg-MSE, unseen operator", m.op === undefined ? "—" : m.op.toFixed(5)],
+              ["Avg-MSE, unseen scene", m.scene === undefined ? "—" : m.scene.toFixed(5)]];
+    } else {
+      let longest = 0;
+      D.episodes.forEach(e => { if (!e.keep && e.dur > longest) longest = e.dur; });
+      rows = [["episodes", D.n_total], ["dropped", D.n_dropped],
+              ["median length", D.median_dur + "s"],
+              ["longest dropped", longest ? longest.toFixed(0) + "s" : "—"]];
+    }
+    document.getElementById("readout").innerHTML = rows.map(r =>
+      '<div class="row"><span class="lab">' + r[0] + '</span><span class="val">' +
+      r[1] + '</span></div>').join("");
   }
 
   function renderBars() {
+    if (!hasSel()) return;
     const vals = ORDER.map(c => (D.mse[c] || {}).pct_op).filter(v => v !== undefined);
     const span = Math.max(...vals.map(Math.abs), 1) * 1.15;
     document.getElementById("bars").innerHTML = ORDER.map(c => {
       const p = (D.mse[c] || {}).pct_op;
       if (p === undefined) return "";
-      const half = 50 / span;                       // % of track per unit
-      const w = Math.abs(p) * half;
+      const w = Math.abs(p) * (50 / span);
       const left = p < 0 ? 50 - w : 50;
       const color = p < 0 ? "var(--good)" : "var(--drop)";
-      const cur = c === current ? " cur" : "";
-      return `<div class="bar">
-        <span class="name${cur}">${LABEL[c]}</span>
-        <span class="track"><span class="zero" style="left:50%"></span>
-          <span class="fill" style="left:${left}%;width:${w}%;background:${color}"></span></span>
-        <span class="num">${p > 0 ? "+" : ""}${p.toFixed(2)}%</span>
-      </div>`;
+      return '<div class="bar"><span class="name' + (c === current ? " cur" : "") + '">' +
+        LABEL[c] + '</span><span class="track"><span class="zero" style="left:50%"></span>' +
+        '<span class="fill" style="left:' + left + '%;width:' + w + '%;background:' + color +
+        '"></span></span><span class="num">' + (p > 0 ? "+" : "") + p.toFixed(2) + '%</span></div>';
     }).join("");
   }
 
   function renderAll() {
-    renderStats(); renderButtons(); renderReadout(); renderBars(); draw();
+    renderTabs(); renderStats(); renderButtons(); renderReadout(); renderBars(); draw();
   }
 
-  // --- hover --------------------------------------------------------------
   function nearest(mx, my) {
     let best = -1, bd = 18 * 18;
     for (let i = 0; i < pts.length; i++) {
-      const dx = pts[i].px - mx, dy = pts[i].py - my;
-      const d = dx * dx + dy * dy;
+      const dx = pts[i].px - mx, dy = pts[i].py - my, d = dx * dx + dy * dy;
       if (d < bd) { bd = d; best = i; }
     }
     return best;
   }
+
+  const REASON = {
+    runaway_length: "ran far longer than this lab's typical episode",
+    suspiciously_short: "far shorter than this lab's typical episode",
+    too_short: "under 3 seconds",
+    no_motion: "hands barely moved",
+    tracking_dropout: "missing pose values",
+    frozen_tracker: "pose frozen for over 2s"
+  };
 
   cv.addEventListener("pointermove", (ev) => {
     const r = cv.getBoundingClientRect();
@@ -461,23 +522,21 @@
     const my = (ev.clientY - r.top) * (cv.height / r.height);
     const i = nearest(mx, my);
     if (i < 0) { tip.style.opacity = 0; return; }
-    const e = EPS[i];
-    const S = selectedSet();
-    tip.innerHTML =
-      (e.t ? `<img src="${e.t}" alt="">` : "") +
-      `<div class="tl">
-         <span>${D.operators[e.op].slice(0, 12)} · scene ${D.scenes[e.sc] || "—"}</span>
-         <span>${e.dur.toFixed(0)}s · ${e.motion.toFixed(2)} m/s mean hand speed</span>
-         ${!e.keep ? `<span class="why">dropped: ${e.why}</span>`
-                   : (S.has(i) ? `<span class="st">selected</span>` : `<span>in pool</span>`)}
-       </div>`;
+    const e = D.episodes[i], S = selectedSet();
+    const why = e.why ? e.why.split("|").map(k => REASON[k] || k).join(", ") : "";
+    const ratio = (e.dur / D.median_dur).toFixed(1);
+    tip.innerHTML = (e.t ? '<img src="' + e.t + '" alt="">' : "") +
+      '<div class="tl"><span>' + e.dur.toFixed(0) + 's (' + ratio + '× median) · ' +
+      e.motion.toFixed(2) + ' m/s</span>' +
+      (!e.keep ? '<span class="why">dropped: ' + why + '</span>'
+               : (S.has(i) ? '<span class="st">selected</span>' : '<span>in pool</span>')) +
+      '</div>';
     tip.style.opacity = 1;
     const tw = 200, th = 190;
     let lx = ev.clientX + 16, ly = ev.clientY + 16;
     if (lx + tw > innerWidth) lx = ev.clientX - tw;
     if (ly + th > innerHeight) ly = ev.clientY - th;
-    tip.style.left = lx + "px";
-    tip.style.top = ly + "px";
+    tip.style.left = lx + "px"; tip.style.top = ly + "px";
   });
   cv.addEventListener("pointerleave", () => { tip.style.opacity = 0; });
 
@@ -485,7 +544,6 @@
     showDrops = e.target.checked; draw();
   });
 
-  // Repaint on theme flips so canvas colors follow the tokens.
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", draw);
   new MutationObserver(draw).observe(document.documentElement,
     { attributes: true, attributeFilter: ["data-theme"] });

@@ -82,7 +82,15 @@ def strip(ep: str):
         if img is None:
             continue
         h, w = img.shape[:2]
-        tiles.append(cv2.resize(img, (FRAME_W, int(h * FRAME_W / w)), interpolation=cv2.INTER_AREA))
+        tile = cv2.resize(img, (FRAME_W, int(h * FRAME_W / w)), interpolation=cv2.INTER_AREA)
+        # Stamp the timestamp on every frame. Without it there is no way to see that the
+        # five frames of a dropped episode span thirteen minutes rather than eleven seconds,
+        # which is the entire reason it was dropped.
+        label = f"t = {i / 30.0:.0f}s"
+        cv2.rectangle(tile, (0, 0), (94, 22), (0, 0, 0), -1)
+        cv2.putText(tile, label, (6, 16), cv2.FONT_HERSHEY_SIMPLEX, 0.48, (255, 255, 255), 1,
+                    cv2.LINE_AA)
+        tiles.append(tile)
     if not tiles:
         return
     gap = 6
@@ -110,12 +118,13 @@ import matplotlib.pyplot as plt
 def caption(ep, verdict):
     r = kd.loc[ep]
     if verdict == "KEPT":
-        return (f"typical episode · {r.duration_s:.0f}s (median is {med:.0f}s) · "
-                f"{r.motion_energy:.2f} m/s mean hand speed · no rule fired")
+        return (f"KEPT — one garment, start to finish in {r.duration_s:.0f}s "
+                f"(the lab median is {med:.0f}s). No rule fired.")
     reason = str(r.drop_reason)
     if "runaway_length" in reason:
-        return (f"{r.duration_s:.0f}s — over 3x the median of {med:.0f}s. A whole session, "
-                f"not one demonstration · dropped")
+        return (f"DROPPED for length — {r.duration_s:.0f}s, {r.duration_s/med:.0f}x the "
+                f"{med:.0f}s median. Watch the garment change between frames: this is a whole "
+                f"folding session labelled as one demonstration.")
     if "suspiciously_short" in reason:
         return (f"{r.duration_s:.0f}s — under 15% of the median of {med:.0f}s. A fragment · dropped")
     return f"{reason} · {r.duration_s:.0f}s · dropped"
@@ -136,7 +145,8 @@ for ax, (ep, verdict, color) in zip(axes, ROWS):
 fig.suptitle(f"What the quality gate is actually looking at  —  lab {LAB}",
              fontsize=16.5, fontweight="bold", color="#14161a", y=0.998)
 fig.text(0.5, 0.004,
-         "Five frames sampled evenly across each episode, chosen by ranking on the signal rather than by eye.",
+         "Five frames sampled evenly across each episode. Note the timestamps: the kept episodes span seconds, "
+         "the dropped ones span minutes and cover many different garments. Nothing here is about hands.",
          ha="center", fontsize=10, color="#7c7b76")
 fig.tight_layout(rect=[0.012, 0.021, 1, 0.979])
 outfig = REPORTS / "figs" / "gate_examples.png"
