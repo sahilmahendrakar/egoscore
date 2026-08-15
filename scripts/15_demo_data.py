@@ -91,7 +91,7 @@ for i, row in gated.iterrows():
         "op": op_i[str(row["operator"])],
         "sc": sc_i[str(row["scene"])],
         "dur": round(float(row["duration_s"]), 1),
-        "oof": round(float(row["oof_max"]), 3),
+        "motion": round(float(row["motion_energy"]), 3),
         "keep": bool(row["keep"]),
         "why": str(row["drop_reason"]),
         "t": thumb,

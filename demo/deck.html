@@ -155,15 +155,15 @@
   <section class="slide on">
     <div class="eyebrow">EgoVerse Data Optimization &amp; Evaluation Suite · Track 1</div>
     <h1>EgoScore</h1>
-    <p class="big">We picked a quarter of EgoVerse and checked whether that quarter was
-      better than a quarter picked at random. It was.</p>
+    <p class="big">We picked a quarter of EgoVerse and checked whether that quarter trained a
+      better model than a quarter picked at random. It did.</p>
     <div class="grid g3">
       <div class="card"><span class="k">Slice</span><span class="v">572</span>
         <p><span class="mono">fold_clothes</span> episodes from lab <span class="mono">rl2</span></p></div>
-      <div class="card"><span class="k">Best selector</span><span class="v good">−3.79%</span>
+      <div class="card"><span class="k">Best selector</span><span class="v good">−3.77%</span>
         <p>Avg-MSE against random, winning 40 of 40 paired tests</p></div>
-      <div class="card accent"><span class="k">Control that should lose</span><span class="v bad">+7.12%</span>
-        <p>lost 40 of 40, which is how we know the test works</p></div>
+      <div class="card accent"><span class="k">Control that should lose</span><span class="v bad">+7.01%</span>
+        <p>lost 39 of 40, which is how we know the test works</p></div>
     </div>
     <p class="cite">github.com/sahilmahendrakar/egoscore</p>
   </section>
@@ -221,53 +221,60 @@
   <section class="slide">
     <div class="eyebrow">Step 1 of 4</div>
     <h2>The gate: throw out episodes that are broken</h2>
-    <p>Six rules, all arithmetic on the hand and head pose arrays. No model, no judgement call.
-      Every dropped episode records which rule caught it.</p>
+    <p>Six rules, all arithmetic on the pose arrays. No model, no judgement call. Every dropped
+      episode records which rule caught it. Two of the rules scale to the lab's own median
+      episode length, because a "normal" episode is 93 s in one lab and 11 s in another.</p>
     <div class="tblwrap"><table>
-      <thead><tr><th>Rule</th><th>What it measures</th><th class="num">Caught</th></tr></thead>
+      <thead><tr><th>Rule</th><th>What it measures</th><th class="num">rl2</th><th class="num">mecka</th><th class="num">microagi</th></tr></thead>
       <tbody>
-        <tr><td>tracking dropout</td><td>NaN or missing pose values in more than 5% of frames</td><td class="num">0</td></tr>
-        <tr><td>frozen tracker</td><td>pose repeats bit-for-bit for more than 2 seconds</td><td class="num">0</td></tr>
-        <tr class="hero"><td>hands out of frame</td><td>a hand sits outside the camera image in more than half the frames</td><td class="num">1</td></tr>
-        <tr><td>too short</td><td>under 3 seconds, can't contain a fold</td><td class="num">0</td></tr>
-        <tr><td>no motion</td><td>hands travelled less than 10 cm in total</td><td class="num">0</td></tr>
-        <tr class="hero"><td>runaway length</td><td>longer than the 99th percentile (234 s), a recording someone forgot to cut</td><td class="num">6</td></tr>
+        <tr><td>tracking dropout</td><td>NaN or missing pose in over 5% of frames</td><td class="num">0%</td><td class="num">0%</td><td class="num">0%</td></tr>
+        <tr><td>frozen tracker</td><td>pose repeats bit-for-bit for over 2 seconds</td><td class="num">0%</td><td class="num">0%</td><td class="num">0%</td></tr>
+        <tr><td>too short</td><td>under 3 seconds, can't contain a fold</td><td class="num">0%</td><td class="num">1.2%</td><td class="num">0%</td></tr>
+        <tr><td>no motion</td><td>hands travelled under 10 cm in total</td><td class="num">0%</td><td class="num">0%</td><td class="num">0%</td></tr>
+        <tr class="hero"><td>runaway length</td><td>over 3x the lab's median length — a session, not a demo</td><td class="num">0%</td><td class="num">0%</td><td class="num">15.9%</td></tr>
+        <tr><td>fragment</td><td>under 15% of the lab's median length</td><td class="num">0.2%</td><td class="num">0%</td><td class="num">0%</td></tr>
       </tbody>
     </table></div>
-    <p><strong>7 of 572 episodes dropped, 1.2%.</strong> The two rules people expect to matter,
-      dropout and frozen trackers, caught nothing at all. EgoVerse's pose pipeline is solid.</p>
+    <p class="big"><strong>rl2 is essentially spotless: 1 episode in 572.</strong> The biggest slice
+      of fold_clothes data, microagi, drops <strong>1 in 6</strong>.</p>
+    <p class="cite">A note on the thresholds: we started with a 99th-percentile rule and threw it out.
+      A percentile drops exactly 1% of whatever you point it at, clean or filthy, so it can't
+      tell you anything. A multiple of the median can come back 0% or 16%, and here it does both.</p>
   </section>
 
   <!-- 6 -->
   <section class="slide">
     <div class="eyebrow">Step 1 · what that looks like</div>
     <h2>Good episodes and bad ones</h2>
-    <img class="fig tall" src="__FIG_GATE__" alt="Five episodes shown as four frames each: two kept with hands clearly folding, one dropped for a hand outside the frame, one dropped for running 274 seconds, and one that an earlier version of the gate wrongly dropped.">
-    <p>Top two are keepers: hands in view, one garment, a clear start and finish. Third has a hand
-      below the frame edge for 92% of the episode. Bottom row is the interesting one — an earlier
-      version of our gate threw it away, wrongly. Next slide.</p>
+    <img class="fig tall" src="__FIG_GATE__" alt="Four microagi episodes shown as five frames each: two typical-length keepers and two dropped for running far longer than the lab's median episode.">
+    <p>From microagi, where the gate actually fires. The keepers run about 11 seconds, which is
+      one fold. The dropped pair run several times that: somebody left the recorder going across
+      multiple garments, so the episode boundary doesn't mean what it means everywhere else.</p>
   </section>
 
   <!-- 7 -->
   <section class="slide">
-    <div class="eyebrow">Step 1 · a bug we shipped and then caught</div>
-    <h2>The gate was wrong, and pictures are what told us</h2>
-    <p>Our first version dropped 23 episodes for "hands out of frame." Then we rendered the
-      frames to put in this deck, and the hands were right there in every one.</p>
-    <div class="grid g2">
-      <div class="card bad"><span class="k">What we did</span>
-        <p>EgoVerse stores intrinsics as a 3×4 K matrix, which invites the textbook pinhole
-          projection <span class="mono">u = f·x/z</span>. We used it.</p></div>
-      <div class="card accent"><span class="k">What's actually true</span>
-        <p>Aria's camera is a fisheye. The right projection is roughly
-          <span class="mono">r = f·θ</span>, not <span class="mono">r = f·tan θ</span>.</p></div>
+    <div class="eyebrow">Step 1 · a rule we deleted</div>
+    <h2>We had a seventh rule. We couldn't prove it, so we cut it.</h2>
+    <p>It projected the hand keypoints into the camera image and flagged episodes where the hands
+      left the frame. It dropped 23 episodes. Then we rendered those frames to put in this deck,
+      and the hands were plainly visible in every one.</p>
+    <div class="grid g3">
+      <div class="card bad"><span class="k">Attempt 1</span>
+        <p>Treat keypoints as camera-frame points and use the stored 3×4 K matrix.
+          <strong>0 of 42</strong> keypoints land in frame.</p></div>
+      <div class="card bad"><span class="k">Attempt 2</span>
+        <p>Transform by the head pose first, then project.
+          <strong>0 of 42</strong> keypoints land in frame.</p></div>
+      <div class="card accent"><span class="k">What we did</span>
+        <p>Deleted the rule. We could not establish the stored coordinate convention, so every
+          number it produced was unfounded.</p></div>
     </div>
-    <p class="big">A hand 60° off to the side lands at 462 px under pinhole, which is outside a
-      640×480 image. Under fisheye it lands at 279 px, comfortably inside. We were throwing
-      away every episode where someone worked with their hands out wide.</p>
-    <p>After the fix the rule catches 1 episode instead of 23. The bottom row of the previous
-      slide is one of the 22 we got back. None of the headline numbers moved, because the gate
-      turns out not to matter much either way — but we'd have been wrong on stage.</p>
+    <p class="big">The remaining six rules use durations, distances and NaN counts only. None of
+      them touches camera geometry, which is also why they compare cleanly across labs.</p>
+    <p>Worth saying out loud: the histogram of that signal looked perfectly reasonable. Nothing
+      about it flagged itself as wrong. Rendering the frames is what caught it, and we only did
+      that because we wanted a picture for a slide.</p>
   </section>
 
   <!-- 8 -->
@@ -361,18 +368,19 @@
     <div class="tblwrap"><table>
       <thead><tr><th>Method</th><th class="num">Wins</th><th class="num">Mean Avg-MSE</th><th class="num">p</th></tr></thead>
       <tbody>
-        <tr class="hero"><td>log-det (DPP)</td><td class="num">40/40</td><td class="num neg">−3.79%</td><td class="num">2e−12</td></tr>
-        <tr><td>curated (facility location)</td><td class="num">37/40</td><td class="num neg">−2.51%</td><td class="num">1e−09</td></tr>
-        <tr><td>k-center</td><td class="num">36/40</td><td class="num neg">−3.42%</td><td class="num">2e−10</td></tr>
-        <tr><td>skip the quality gate</td><td class="num">24/40</td><td class="num ns">−0.73%</td><td class="num ns">0.27</td></tr>
-        <tr class="ctrl"><td>degenerate (the control)</td><td class="num">0/40</td><td class="num pos">+7.12%</td><td class="num">2e−12</td></tr>
+        <tr class="hero"><td>log-det (DPP)</td><td class="num">40/40</td><td class="num neg">−3.77%</td><td class="num">2e−12</td></tr>
+        <tr><td>curated (facility location)</td><td class="num">36/40</td><td class="num neg">−2.39%</td><td class="num">1e−09</td></tr>
+        <tr><td>k-center</td><td class="num">37/40</td><td class="num neg">−3.44%</td><td class="num">6e−11</td></tr>
+        <tr><td>skip the quality gate</td><td class="num">10/40</td><td class="num ns">+0.16%</td><td class="num ns">0.30</td></tr>
+        <tr class="ctrl"><td>degenerate (the control)</td><td class="num">1/40</td><td class="num pos">+7.01%</td><td class="num">1e−11</td></tr>
       </tbody>
     </table></div>
-    <p><strong>Choosing well matters. Filtering doesn't.</strong> Skipping the quality gate
-      entirely costs nothing we can measure. It only drops 7 episodes out of 572, and this data
-      is clean enough that there's nothing for it to catch.</p>
-    <p class="cite">That reverses what we said after 3 seeds, when the gate looked worth about a
-      percent. Ten seeds killed it.</p>
+    <p><strong>Choosing well matters. Filtering doesn't — here.</strong> Skipping the gate costs
+      nothing measurable on rl2, which makes sense: it only drops 1 episode in 572. On microagi,
+      where it drops 1 in 6, it would presumably matter a great deal. We can't test that, because
+      microagi has no operator or scene labels to hold out.</p>
+    <p class="cite">This also reverses what we said after 3 seeds, when the gate looked worth about
+      a percent. Ten seeds killed it.</p>
   </section>
 
   <!-- 15 -->
@@ -382,10 +390,10 @@
     <p>It's a small number, on a proxy metric, over a few hundred episodes. The obvious worry is
       that our measurement is too noisy to see anything and we got lucky.</p>
     <p class="big">So we added a method designed to lose. Same budget, but spent inside as few
-      operator×scene groups as possible: 21 instead of 73.</p>
+      operator×scene groups as possible: about 21 instead of about 73.</p>
     <div class="grid g2">
-      <div class="card bad"><span class="k">Degenerate</span><span class="v bad">0 / 40</span>
-        <p>+7.12% Avg-MSE, p = 2e−12</p></div>
+      <div class="card bad"><span class="k">Degenerate</span><span class="v bad">1 / 40</span>
+        <p>+7.01% Avg-MSE, p = 1e−11</p></div>
       <div class="card"><span class="k">Why that settles it</span>
         <p>The EgoVerse paper already showed that operator and scene variety improve
           generalization. Our setup reproduces that. So it can detect a real effect of this
@@ -467,9 +475,9 @@
       <li><strong>One task, one lab.</strong> We can't claim this transfers. We didn't choose
         <span class="mono">rl2</span> because it suited us, we chose it because it was the only
         slice with the metadata.</li>
-      <li><strong>The gate rule we kept, we can't validate.</strong> "Hands out of frame" matters
-        for a policy that looks at pixels. Ours doesn't, so our own metric can't confirm the rule
-        is worth having.</li>
+      <li><strong>We can't price the gate where it matters.</strong> It drops 1 in 6 microagi
+        episodes and 1 in 572 rl2 episodes, but only rl2 has the operator and scene labels our
+        experiment needs. So the place the gate does something is the place we can't measure it.</li>
       <li><strong>Facility location was our pick going in, and it lost</strong> to log-det and
         k-center. We left it in the table rather than quietly reordering the story.</li>
     </ul>

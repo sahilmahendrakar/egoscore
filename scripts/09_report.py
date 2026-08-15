@@ -90,10 +90,11 @@ w(f"- **Diversity-based selection wins consistently.** `dpp` wins {winrate('dpp'
   f"{winrate('curated')[0]}/{n_tests}.")
 w(f"- **The quality gate does *not* measurably help on this slice.** `random_nogate` is "
   f"{winrate('random_nogate')[0]}/{n_tests} at {winrate('random_nogate')[2]:+.2f}%, "
-  f"p={pval('random_nogate'):.2f} — indistinguishable from no effect. We report this rather than "
-  f"the opposite conclusion we drew at 3 seeds: the gate drops only 5% of `rl2`, almost all for "
-  f"hands leaving frame, and on data this clean filtering has nothing to bite on. **Selection "
-  f"matters here; filtering does not.**")
+  f"sign-test p={float(sig.loc['random_nogate','p_sign']):.2f} — indistinguishable from no "
+  f"effect. That makes sense: the gate drops {n_drop} of {n_eps} `rl2` episodes, so there is "
+  f"almost nothing for filtering to remove. On `microagi` the same gate drops 15.9%, where it "
+  f"would presumably matter — but `microagi` has no operator or scene labels, so the experiment "
+  f"cannot be run there. **Selection matters here; filtering has nothing to bite on.**")
 w(f"- **The positive control fires.** `degenerate` — the same budget concentrated into as few "
   f"operator x scene groups as possible — loses {winrate('degenerate')[0]}/{n_tests} at "
   f"{winrate('degenerate')[2]:+.2f}% (p={pval('degenerate'):.0e}). See below for why this matters "
@@ -172,10 +173,28 @@ w(f"{n_drop}/{n_eps} episodes dropped ({100.0*n_drop/n_eps:.1f}%).")
 w("")
 w(audit.to_markdown(index=False))
 w("")
-w("**What this says about the data:** `rl2` flagship data is clean on the axes people usually")
-w("worry about. Zero episodes have non-finite poses; zero have a frozen tracker. Every drop")
-w("came from hands leaving the frame or from un-segmented long recordings. A gate designed")
-w("around imagined failure modes would have found nothing here.")
+w("**What this says about the data:** `rl2` flagship data is essentially spotless — 1 episode")
+w("in 572. Zero have non-finite poses; zero have a frozen tracker. A gate designed around")
+w("imagined failure modes would find nothing here. The interesting prevalence is elsewhere:")
+w("see the cross-lab section.")
+w("")
+w("### A rule we deleted")
+w("")
+w("An earlier version had a seventh rule that projected hand keypoints into the camera image")
+w("and flagged episodes where the hands left frame. It dropped 23 episodes. We then rendered")
+w("those frames for a figure and the hands were plainly visible in all of them.")
+w("")
+w("We tried two projection models — keypoints as camera-frame points, and keypoints")
+w("transformed by the head pose first. Under both, **zero of the 42 keypoints** land inside")
+w("the image on frames where the hands are obviously visible")
+w("(`scripts/22_projection_check.py`). We could not establish the stored convention, so we")
+w("removed the rule rather than ship a third guess. Every number it produced was unfounded.")
+w("")
+w("The six surviving rules use durations, distances and NaN counts only. None touches camera")
+w("geometry, which is also why they compare cleanly across labs.")
+w("")
+w("The histogram of the deleted signal looked entirely reasonable. Rendering the frames is")
+w("what caught it, and we only did that because we wanted a picture for a slide.")
 w("")
 w("One trap worth recording: zarr arrays are zero-padded up to a chunk boundary, and the true")
 w("length is `total_frames` in the group attrs. Reading the raw array without truncating")

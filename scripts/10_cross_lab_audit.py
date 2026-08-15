@@ -22,17 +22,25 @@ from egoscore.features import quality_signals
 ROOT = Path(__file__).resolve().parent.parent
 REPORTS = ROOT / "reports"
 
-# Signals that do not depend on camera intrinsics, and are therefore comparable
-# across rigs without re-verifying the projection model.
-RIG_INDEPENDENT = [
+# Every rule the gate now uses. None depends on camera geometry, so all of them are
+# directly comparable across rigs -- which is the whole point of running this.
+ABS_RULES = [
     ("tracking_dropout", "nan_max", 0.05, "gt"),
     ("frozen_tracker", "frozen_run_max_s", 2.0, "gt"),
     ("too_short", "duration_s", 3.0, "lt"),
     ("no_motion", "path_len_total", 0.10, "lt"),
 ]
+# Median-relative rules are computed per lab, since "typical episode" differs by 14x
+# between labs and a shared threshold would be meaningless.
+REL_RULES = [
+    ("runaway_length", "duration_s", 3.0, "gt"),
+    ("suspiciously_short", "duration_s", 0.15, "lt"),
+]
+RIG_INDEPENDENT = ABS_RULES
 
 LABS = [("rl2", ROOT / "data" / "poses", "aria_gen1"),
-        ("mecka", ROOT / "data" / "poses_mecka", "mecka")]
+        ("mecka", ROOT / "data" / "poses_mecka", "mecka"),
+        ("microagi", ROOT / "data" / "poses_microagi", "microagi")]
 
 meta = pd.read_csv(REPORTS / "slice_fold_clothes.csv").set_index("episode_hash")
 
@@ -60,20 +68,29 @@ df = pd.DataFrame(rows)
 if df.empty:
     sys.exit("no episodes")
 
-# Apply the rig-independent rules.
-for name, col, thresh, op in RIG_INDEPENDENT:
+# Absolute rules, identical everywhere.
+for name, col, thresh, op in ABS_RULES:
     v = df[col].astype(float)
     df[f"rule_{name}"] = (v > thresh) if op == "gt" else (v < thresh)
-rule_cols = [f"rule_{n}" for n, _, _, _ in RIG_INDEPENDENT]
+
+# Median-relative rules, recomputed within each lab.
+for name, col, mult, op in REL_RULES:
+    df[f"rule_{name}"] = False
+    for lab, g in df.groupby("lab"):
+        t = float(g[col].median()) * mult
+        hit = (g[col] > t) if op == "gt" else (g[col] < t)
+        df.loc[g.index, f"rule_{name}"] = hit.values
+
+rule_cols = [f"rule_{n}" for n, _, _, _ in ABS_RULES + REL_RULES]
 df["drop_rig_independent"] = df[rule_cols].any(axis=1)
 
 df.to_csv(REPORTS / "cross_lab_quality.csv", index=False)
 
-print("\n=== cross-lab prevalence (rig-independent signals only) ===")
+print("\n=== cross-lab prevalence ===")
 summary = []
 for lab, g in df.groupby("lab"):
     row = {"lab": lab, "n_episodes": len(g)}
-    for name, _, _, _ in RIG_INDEPENDENT:
+    for name, _, _, _ in ABS_RULES + REL_RULES:
         row[name] = f"{100.0*g[f'rule_{name}'].mean():.1f}%"
     row["ANY"] = f"{100.0*g['drop_rig_independent'].mean():.1f}%"
     row["median_dur_s"] = f"{g['duration_s'].median():.0f}"
@@ -90,5 +107,5 @@ for col in ["duration_s", "motion_energy", "path_len_total", "frozen_run_max_s",
         line += f"  {lab}: p50={g[col].median():8.2f} p95={g[col].quantile(0.95):8.2f}"
     print(line)
 
-print("\nNOTE: hands-out-of-frame is intrinsics-dependent and is EXCLUDED above.")
-print("      It is reported for rl2 (Aria) only, in reports/gate_audit.csv.")
+print("\nAll rules above are camera-geometry-free, so the columns are directly comparable.")
+print("Median-relative rules use each lab's own median episode length.")

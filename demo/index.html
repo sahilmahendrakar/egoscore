@@ -467,7 +467,7 @@
       (e.t ? `<img src="${e.t}" alt="">` : "") +
       `<div class="tl">
          <span>${D.operators[e.op].slice(0, 12)} · scene ${D.scenes[e.sc] || "—"}</span>
-         <span>${e.dur.toFixed(0)}s · ${(e.oof * 100).toFixed(1)}% hand off-frame</span>
+         <span>${e.dur.toFixed(0)}s · ${e.motion.toFixed(2)} m/s mean hand speed</span>
          ${!e.keep ? `<span class="why">dropped: ${e.why}</span>`
                    : (S.has(i) ? `<span class="st">selected</span>` : `<span>in pool</span>`)}
        </div>`;

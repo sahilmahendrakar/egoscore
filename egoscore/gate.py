@@ -12,21 +12,38 @@ import numpy as np
 import pandas as pd
 
 # Absolute rules: these describe broken data, not unusual data.
+#
+# NOTE ON A REMOVED RULE. We previously had a `hands_out_of_frame` rule that projected the
+# hand keypoints into the image and flagged episodes where they landed outside it. It is
+# gone, because we could not establish the correct keypoint-to-pixel mapping.
+#
+# Two projection models were tried and both are refuted by simply drawing the result on
+# the frames (scripts/22_projection_check.py): treating the keypoints as camera-frame
+# points, and transforming them by the head pose first. Under both, *zero* of the 42
+# keypoints land inside the image on frames where the hands are plainly visible. Something
+# about the stored convention is not what we assumed, and rather than ship a third guess we
+# removed the rule. Any number it produced would have been unfounded.
+#
+# The remaining rules use only durations, motion magnitudes and NaN counts. None of them
+# depend on camera geometry, so none of them are affected.
 HARD_RULES = [
     ("tracking_dropout", "nan_max", 0.05, "gt", "non-finite pose/keypoint values in >5% of frames"),
     ("frozen_tracker", "frozen_run_max_s", 2.0, "gt", "pose held bit-identical for >2s (tracker dropout)"),
-    # Visual usability only. The hand *pose* stays valid when a hand leaves the RGB frame
-    # (Aria tracks hands from its SLAM cameras, and nan_max is 0 for every such episode),
-    # so this rule matters for a vision-conditioned policy and not for our proprioceptive
-    # proxy. We therefore cannot validate it with our own metric, and say so in the report.
-    ("hands_out_of_frame", "oof_max", 0.50, "gt", "a hand is outside the RGB image in >50% of frames"),
     ("too_short", "duration_s", 3.0, "lt", "shorter than 3s — cannot contain a fold"),
     ("no_motion", "path_len_total", 0.10, "lt", "hands travelled <10cm in total"),
 ]
 
-# Relative rules: set from the slice's own distribution.
-QUANTILE_RULES = [
-    ("truncated_or_runaway_hi", "duration_s", 0.99, "gt", "duration above the 99th percentile — likely un-segmented recording"),
+# Relative rules, scaled to the slice's own typical episode.
+#
+# We used to use the 99th percentile here, which is circular: a percentile rule drops
+# exactly 1% of any dataset you point it at, however clean or dirty. A multiple of the
+# median can fire at 0% on tidy data and at 30% on a badly segmented dump, which is what
+# a prevalence audit needs in order to say anything.
+MEDIAN_MULTIPLE_RULES = [
+    ("runaway_length", "duration_s", 3.0, "gt",
+     "more than 3x the median episode length — an un-segmented recording, not one demo"),
+    ("suspiciously_short", "duration_s", 0.15, "lt",
+     "under 15% of the median episode length — a fragment, not a demo"),
 ]
 
 
@@ -46,16 +63,16 @@ def apply_gate(df: pd.DataFrame) -> pd.DataFrame:
         for i in np.flatnonzero(hit.to_numpy()):
             reasons[i].append(name)
 
-    for name, col, q, op, _desc in QUANTILE_RULES:
+    for name, col, mult, op, _desc in MEDIAN_MULTIPLE_RULES:
         if col not in out.columns:
             out[f"rule_{name}"] = False
             continue
         v = out[col].astype(float)
-        thresh = v.quantile(q)
+        thresh = float(v.median()) * mult
         hit = (v > thresh) if op == "gt" else (v < thresh)
         hit = hit.fillna(True)
         out[f"rule_{name}"] = hit
-        out.attrs[f"thresh_{name}"] = float(thresh)
+        out.attrs[f"thresh_{name}"] = thresh
         for i in np.flatnonzero(hit.to_numpy()):
             reasons[i].append(name)
 
@@ -78,13 +95,13 @@ def describe_thresholds(gated: pd.DataFrame) -> pd.DataFrame:
             "pct": 100.0 * gated[c].mean(),
             "meaning": desc,
         })
-    for name, col, q, op, desc in QUANTILE_RULES:
+    for name, col, mult, op, desc in MEDIAN_MULTIPLE_RULES:
         c = f"rule_{name}"
         if c not in gated:
             continue
         t = gated.attrs.get(f"thresh_{name}", float("nan"))
         rows.append({
-            "rule": name, "signal": col, "test": f"{op} q{q} ({t:.1f})",
+            "rule": name, "signal": col, "test": f"{op} {mult}x median ({t:.0f}s)",
             "n_flagged": int(gated[c].sum()),
             "pct": 100.0 * gated[c].mean(),
             "meaning": desc,

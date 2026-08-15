@@ -8,7 +8,7 @@ Array conventions (EgoVerse human_bimanual):
   {left,right}.obs_ee_pose      (T, 7)   xyz + quaternion
   {left,right}.obs_wrist_pose   (T, 7)   xyz + quaternion
   obs_head_pose                 (T, 7)   xyz + quaternion, from visual-inertial SLAM
-  {left,right}.obs_keypoints    (T, 63)  21 MANO keypoints x 3, camera frame
+  {left,right}.obs_keypoints    (T, 63)  21 MANO keypoints x 3 (frame convention unresolved)
   obs_eye_gaze                  (T, 3)
 """
 
@@ -18,11 +18,11 @@ import numpy as np
 
 FPS = 30.0
 
-# Aria gen1 pinhole intrinsics. Verified constant across the rl2 slice by
-# scripts/12_verify_intrinsics.py (80 episodes sampled, 1 distinct value, exact match).
-# Used only to test whether keypoints project inside the image.
-ARIA_K = np.array([[266.50860444, 0.0, 320.0], [0.0, 266.50860444, 240.0], [0.0, 0.0, 1.0]])
-IMG_W, IMG_H = 640, 480
+# NOTE: we deliberately compute nothing from camera geometry. An earlier version projected
+# hand keypoints into the image to measure "hands out of frame"; two different projection
+# models both put zero keypoints inside the frame on images where the hands are obviously
+# visible (scripts/22_projection_check.py), so the signal was removed rather than guessed at
+# again. Everything below uses durations, distances and motion only.
 
 
 def _finite(a: np.ndarray) -> np.ndarray:
@@ -99,52 +99,6 @@ def quality_signals(ep: dict[str, np.ndarray]) -> dict:
         frozen_runs.append(run)
     out["frozen_frac_max"] = float(max(frozen_fracs)) if frozen_fracs else 1.0
     out["frozen_run_max_s"] = float(max(frozen_runs)) / FPS if frozen_runs else 0.0
-
-    # --- hands in frame ---------------------------------------------------
-    # Keypoints live in a camera frame with -z forward (verified empirically: z is
-    # negative for every episode in the slice).
-    #
-    # The camera is a FISHEYE, not a pinhole. This matters enormously and it is easy
-    # to get wrong: the stored intrinsics are a 3x4 K matrix, which invites a pinhole
-    # projection u = f*x/z. Under pinhole, a wrist 60 deg off-axis lands at
-    # r = f*tan(60) = 462 px and reads as "outside a 640x480 frame" -- while the actual
-    # fisheye image shows it perfectly well at r = f*theta = 279 px.
-    #
-    # We caught this by rendering the frames of the episodes the gate dropped and
-    # seeing hands in every one (scripts/19_episode_strips.py). Using the equidistant
-    # fisheye model r = f*theta instead, off-axis hands are correctly counted as visible.
-    #
-    # Aria's real model is fisheye624; equidistant is an approximation, but it is the
-    # right *family*, and the pinhole alternative is simply wrong.
-    f_px = float(ARIA_K[0, 0])
-    hw, hh = IMG_W / 2.0, IMG_H / 2.0
-    oof = []
-    for name, a in [("left", lkp), ("right", rkp)]:
-        if a is None or len(a) == 0:
-            out[f"oof_{name}"] = 1.0
-            oof.append(1.0)
-            continue
-        k = _kp(np.nan_to_num(a))
-        # Centroid of all 21 keypoints, not the wrist alone: at the frame edge the wrist
-        # routinely falls outside while most of the hand is still visible, and it is the
-        # hand we care about seeing.
-        hand = k.mean(axis=1)
-        fwd = -hand[:, 2]
-        rad = np.linalg.norm(hand[:, :2], axis=1)
-        theta = np.arctan2(rad, fwd)          # angle from the optical axis
-        r_px = f_px * theta                   # equidistant fisheye
-        denom = np.maximum(rad, 1e-9)
-        u = np.abs(r_px * hand[:, 0] / denom)
-        v = np.abs(r_px * hand[:, 1] / denom)
-        # theta > pi/2 means genuinely behind the camera, which no lens recovers.
-        inside = (theta < np.pi / 2) & (u < hw) & (v < hh)
-        frac = float(1.0 - inside.mean())
-        out[f"oof_{name}"] = frac
-        oof.append(frac)
-    out["oof_max"] = float(max(oof))
-    out["wrist_offaxis_deg_p50"] = float(
-        np.degrees(np.median(theta)) if lkp is not None and len(lkp) else 0.0
-    )
 
     # --- motion -----------------------------------------------------------
     speeds = []

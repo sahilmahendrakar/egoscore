@@ -1,8 +1,8 @@
 rule,signal,test,n_flagged,pct,meaning
 tracking_dropout,nan_max,gt 0.05,0,0.0,non-finite pose/keypoint values in >5% of frames
 frozen_tracker,frozen_run_max_s,gt 2.0,0,0.0,pose held bit-identical for >2s (tracker dropout)
-hands_out_of_frame,oof_max,gt 0.5,1,0.17482517482517482,a hand is outside the RGB image in >50% of frames
 too_short,duration_s,lt 3.0,0,0.0,shorter than 3s — cannot contain a fold
 no_motion,path_len_total,lt 0.1,0,0.0,hands travelled <10cm in total
-truncated_or_runaway_hi,duration_s,gt q0.99 (233.7),6,1.048951048951049,duration above the 99th percentile — likely un-segmented recording
-ANY (dropped),-,-,7,1.2237762237762237,union of all rules over 572 episodes
+runaway_length,duration_s,gt 3.0x median (278s),0,0.0,"more than 3x the median episode length — an un-segmented recording, not one demo"
+suspiciously_short,duration_s,lt 0.15x median (14s),1,0.17482517482517482,"under 15% of the median episode length — a fragment, not a demo"
+ANY (dropped),-,-,1,0.17482517482517482,union of all rules over 572 episodes

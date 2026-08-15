@@ -1,12 +1,11 @@
-"""Contact sheets of what the quality gate keeps, what it drops, and what it used to
-drop by mistake.
+"""Contact sheets of what the quality gate keeps and what it drops.
 
-Rendering these frames is how we caught a real bug: the stored intrinsics are a 3x4 K
-matrix, which invites a pinhole projection, but the Aria camera is a fisheye. Under
-pinhole, a hand 60 deg off-axis projects to r = f*tan(60) = 462 px and reads as "outside
-a 640x480 image" while the fisheye frame shows it perfectly well at r = f*theta = 279 px.
-The gate was flagging 23 episodes with clearly visible hands. Looking at the pictures is
-what surfaced it -- no amount of staring at the histogram would have.
+Rendering these frames is how we caught a real bug. An earlier gate had a rule that
+projected hand keypoints into the image and flagged "hands out of frame"; the frames of
+the episodes it dropped showed hands in plain view. Two different projection models both
+failed (scripts/22_projection_check.py), so we removed the rule rather than guess again.
+Looking at the pictures is what surfaced it. No amount of staring at the histogram would
+have.
 """
 
 import sys
@@ -31,23 +30,36 @@ OUT.mkdir(parents=True, exist_ok=True)
 N_FRAMES = 5
 FRAME_W = 300
 
-# Episodes the old pinhole model wrongly flagged; kept correctly once the projection was
-# fixed. Recorded explicitly so the figure documents the correction.
-PINHOLE_FALSE_POSITIVES = ["2025-10-29-22-05-17-839000", "2025-10-13-03-58-47-763000"]
+# Which lab to illustrate. rl2 is almost perfectly clean, so its gate figure is boring by
+# construction; microagi is where the gate actually fires.
+LAB = sys.argv[1] if len(sys.argv) > 1 else "microagi"
 
-kd = pd.read_csv(REPORTS / "keep_drop.csv").set_index("episode_hash")
+if LAB == "rl2":
+    kd = pd.read_csv(REPORTS / "keep_drop.csv").set_index("episode_hash")
+else:
+    xl = pd.read_csv(REPORTS / "cross_lab_quality.csv")
+    kd = xl[xl["lab"] == LAB].copy()
+    kd["keep"] = ~kd["drop_rig_independent"]
+    rule_cols = [c for c in kd.columns if c.startswith("rule_")]
+    kd["drop_reason"] = [
+        "|".join(c[5:] for c in rule_cols if r[c]) for _, r in kd.iterrows()
+    ]
+    kd = kd.set_index("episode_hash")
+
 meta = pd.read_csv(REPORTS / "slice_fold_clothes.csv").set_index("episode_hash")
 
 # Four rows keeps the composite landscape, which is what a 16:9 slide can actually show.
-kept = kd[kd["keep"]].nsmallest(2, "oof_max").index.tolist()
-oof_drop = kd[kd["rule_hands_out_of_frame"]].index.tolist()[:1]
-fp = [h for h in PINHOLE_FALSE_POSITIVES if h in kd.index][:1]
+med = kd["duration_s"].median()
+# Two typical keepers (closest to the median length), plus whatever the gate actually caught.
+kept = (kd[kd["keep"]]
+        .assign(_d=lambda d: (d.duration_s - med).abs())
+        .nsmallest(2, "_d").index.tolist())
+dropped = kd[~kd["keep"]].nlargest(2, "duration_s").index.tolist()
+if len(dropped) < 2:
+    dropped += kd[~kd["keep"]].nsmallest(2 - len(dropped), "duration_s").index.tolist()
 
-ROWS = (
-    [(h, "KEPT", "#1baf7a") for h in kept]
-    + [(h, "DROPPED", "#e34948") for h in oof_drop]
-    + [(h, "RESCUED", "#eda100") for h in fp]
-)
+ROWS = ([(h, "KEPT", "#1baf7a") for h in kept]
+        + [(h, "DROPPED", "#e34948") for h in dropped])
 print(f"rendering {len(ROWS)} episodes")
 
 creds = load_creds()
@@ -97,16 +109,16 @@ import matplotlib.pyplot as plt
 
 def caption(ep, verdict):
     r = kd.loc[ep]
-    oof = 100 * r.oof_max
     if verdict == "KEPT":
-        return f"hands tracked throughout · {oof:.1f}% of frames off-frame · {r.duration_s:.0f}s"
-    if verdict == "RESCUED":
-        return (f"the old pinhole model called this 100% off-frame — the fisheye model says "
-                f"{oof:.1f}% · kept · {r.duration_s:.0f}s")
-    if r.rule_hands_out_of_frame:
-        return f"a hand is outside the image in {oof:.0f}% of frames · dropped · {r.duration_s:.0f}s"
-    return (f"{r.duration_s:.0f}s — above the 99th percentile, an un-segmented recording "
-            f"rather than one demonstration · dropped")
+        return (f"typical episode · {r.duration_s:.0f}s (median is {med:.0f}s) · "
+                f"{r.motion_energy:.2f} m/s mean hand speed · no rule fired")
+    reason = str(r.drop_reason)
+    if "runaway_length" in reason:
+        return (f"{r.duration_s:.0f}s — over 3x the median of {med:.0f}s. A whole session, "
+                f"not one demonstration · dropped")
+    if "suspiciously_short" in reason:
+        return (f"{r.duration_s:.0f}s — under 15% of the median of {med:.0f}s. A fragment · dropped")
+    return f"{reason} · {r.duration_s:.0f}s · dropped"
 
 
 fig, axes = plt.subplots(len(ROWS), 1, figsize=(15.4, 2.08 * len(ROWS)), facecolor="white")
@@ -121,11 +133,10 @@ for ax, (ep, verdict, color) in zip(axes, ROWS):
             fontsize=10.5, fontweight="bold", color=color)
     ax.set_title(caption(ep, verdict), fontsize=10.5, color="#52514e", loc="left", pad=5)
 
-fig.suptitle("What the quality gate is actually looking at",
+fig.suptitle(f"What the quality gate is actually looking at  —  lab {LAB}",
              fontsize=16.5, fontweight="bold", color="#14161a", y=0.998)
 fig.text(0.5, 0.004,
-         "Five frames sampled evenly across each episode, chosen by ranking on the signal rather than by eye. "
-         "The bottom row is a bug an earlier version of the gate made, which looking at the frames revealed.",
+         "Five frames sampled evenly across each episode, chosen by ranking on the signal rather than by eye.",
          ha="center", fontsize=10, color="#7c7b76")
 fig.tight_layout(rect=[0.012, 0.021, 1, 0.979])
 outfig = REPORTS / "figs" / "gate_examples.png"

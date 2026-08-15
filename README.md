@@ -100,13 +100,20 @@ identical eval windows, so we report **paired** differences.
 
 ## Four things we found in the data
 
-**The camera is a fisheye, and the stored intrinsics tempt you into a pinhole projection.**
-EgoVerse ships intrinsics as a 3×4 K matrix, which invites `u = f·x/z`. Aria's camera is a
-fisheye, where the right model is roughly `r = f·θ`. Under pinhole a hand 60° off-axis lands
-at 462 px — outside a 640×480 image — while the fisheye puts it at 279 px, well inside. Our
-first gate therefore dropped 23 episodes whose hands were plainly visible. We caught it by
-rendering the frames of the episodes we were dropping. After the fix the rule fires on 1
-episode instead of 23, and no headline number moved.
+**We deleted a rule we could not prove.** An earlier gate projected hand keypoints into the
+camera image and flagged "hands out of frame", dropping 23 episodes. Rendering those frames
+showed hands in plain view in every one. We tried two projection models — keypoints as
+camera-frame points, and keypoints transformed by the head pose first — and under both,
+**zero of 42 keypoints** land inside the image on frames where the hands are obviously
+visible (`scripts/22_projection_check.py`). Rather than guess a third time we removed the
+rule. The six surviving rules use durations, distances and NaN counts only, touch no camera
+geometry, and therefore compare cleanly across labs.
+
+**Episode segmentation is wildly inconsistent between labs, and the gate can see it.**
+`rl2` drops 1 episode in 572. `mecka` drops 1.2%. `microagi` — the largest fold_clothes
+slice at 9,896 episodes — drops **15.9%**, all of them recordings running more than 3× that
+lab's median episode length. One in six "episodes" there is a whole folding session rather
+than a single demonstration.
 
 **Zarr arrays are zero-padded to a chunk boundary.** The true length is `total_frames` in
 the group attrs. Read the raw array without truncating and you get a run of identical
