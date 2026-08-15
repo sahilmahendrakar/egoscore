@@ -1,216 +1,231 @@
-# EgoScore — A Curation Engine for EgoVerse
+# EgoScore
 
-**EgoVerse Data Optimization & Evaluation Suite — Track 1: The Curation Engine**
+**Which training videos are worth keeping?**
 
-> *Which episodes are worth training on?*
+EgoScore filters a library of robot-training videos, then selects a small subset of what
+remains that is deliberately varied rather than random. On the collection we tested, a quarter
+of the clips chosen this way trained a **3.5% more accurate** model than a quarter chosen at
+random, winning all 40 head-to-head comparisons.
 
-EgoVerse ships ~456k episodes. Not all of it helps. This repo picks a subset that does,
-and — the part that actually matters — **measures whether the pick beat picking at random.**
+🧭 **[Interactive demo](https://claude.ai/code/artifact/0db5ec63-9657-4738-854a-2703290324cc)** ·
+📊 **[Slides](https://claude.ai/code/artifact/f9b606c2-ad6d-488b-ab9f-727c9875e1f8)** ·
+📄 **[Full write-up](reports/validation.md)**
 
----
-
-## Result
-
-| Selector | Paired wins vs random | Mean Avg-MSE change | Wilcoxon p |
-|---|---|---|---|
-| `dpp` (log-det diversity) | **40/40** | **−3.79%** | 2e−12 |
-| `kcenter` | 36/40 | −3.42% | 2e−10 |
-| `curated` (facility location) | 37/40 | −2.51% | 1e−09 |
-| `random_nogate` (no quality gate) | 24/40 | −0.73% | n.s. |
-| `degenerate` (**positive control**) | 0/40 | **+7.12%** | 2e−12 |
-
-40 comparisons = 10 seeds × 2 budgets × 2 held-out axes. Every selector is compared to
-`random` at the *same seed and budget*, on the *same* held-out windows.
-
-**Selection matters here; filtering does not.** The quality gate is statistically
-indistinguishable from no effect (sign test p = 0.27). It drops only 7 of 572 episodes,
-and on data this clean there is nothing for filtering to bite on. We report this because
-it reverses the conclusion we drew at 3 seeds, where the gate looked worth about a percent.
-
-**The honest headline is not "throw away 75% of your data for free."** Training on the
-full gated pool still beats every subset. It is:
-
-> At a quarter of the budget, diversity-aware selection closes **52%** (unseen operator)
-> and **50%** (unseen scene) of the gap between a random quarter and using everything.
-
-🧭 **[Interactive demo — The Curation Manifold](https://claude.ai/code/artifact/0db5ec63-9657-4738-854a-2703290324cc)** · 📊 **[Slide deck](https://claude.ai/code/artifact/f9b606c2-ad6d-488b-ab9f-727c9875e1f8)** · 📄 **[Validation report](reports/validation.md)**
-
-In the demo you can switch selectors and watch which quarter of the data each one keeps.
-`degenerate` visibly clumps into 21 operator×scene groups; `kcenter` spreads across 104.
-That difference is the whole thesis, and it is what the Avg-MSE gap prices.
-
-![paired](reports/figs/paired.png)
+Built in a day for the EgoVerse Data Optimization & Evaluation Suite, Track 1.
 
 ---
 
-## Why the positive control is the most important row
+## The problem
 
-A 3% margin on a proxy metric over a few hundred episodes is easy to disbelieve, and the
-obvious failure mode is a harness too noisy to detect anything at all.
+[EgoVerse](https://github.com/GaTech-RL2/EgoVerse) is a library of videos of people performing
+everyday tasks, recorded from a camera worn on the head. Robots learn manipulation from them.
 
-So we included a condition that *should* lose, for a reason established independently by
-the EgoVerse paper: demonstrator and scene diversity improve generalization.
-`degenerate` spends the identical budget but concentrates it into ~21 operator × scene
-groups instead of ~73. It loses **0/40 at +7.12%** — large, unambiguous, correctly signed.
+It contains hundreds of thousands of clips. Some are unusable — the hand tracking fails, or the
+recording covers a whole session rather than a single task. Many others are near-duplicates of
+one another, which add training time without adding information.
 
-That is what makes the smaller curated-vs-random margin a measurement rather than noise.
-The control also *weakens* at the larger budget, exactly as it should — at half the pool
-you cannot concentrate the budget much. A control that stayed flat would have been
-suspicious.
+There is currently no established way to decide which clips are worth training on. This is an
+attempt to decide it with a measurement rather than a judgement call.
 
 ---
 
-## Method
+## How it works
 
-**Slice.** `fold_clothes`, `lab=rl2`, `human_bimanual` — 572 episodes, 20 operators,
-16 scenes. This is the **only** slice in EgoVerse with a populated operator × scene grid:
-`microagi` (9,896 fold_clothes episodes) carries no operator or scene metadata at all,
-and `mecka` has 2 scenes. Without that grid neither held-out axis is constructible.
+### 1 · Remove clips that are unusable
 
-**Pipeline.**
+Eight checks, computed directly from the recorded hand and head positions. No learned model is
+involved, and each rejected clip records which check caught it.
 
-```
-episode table (Postgres)
-      │
-      ├─ quality gate ──────► deterministic rules, every drop carries a reason
-      │
-      ├─ episode embedding ─► 41 trajectory/keypoint features, whitened
-      │
-      └─ selection ─────────► facility location (1−1/e greedy guarantee),
-                              DPP log-det, k-center, random, degenerate
-                                        │
-                                        ▼
-                         train identical ridge action-chunk policy
-                         on each subset → compare offline Avg-MSE on
-                         held-out unseen operators / unseen scenes
-```
-
-**Proxy metric.** Offline Avg-MSE, the metric the EgoVerse authors use themselves:
-10 frames of proprioceptive history → 30-step future bimanual EE pose chunk, predicted
-*relative to the current pose* so the model cannot win by memorising room coordinates.
-Random Fourier features + closed-form ridge, so the fit is exact and seed-independent —
-any difference between conditions comes from the data, not from optimiser noise.
-
-**Statistics.** Absolute Avg-MSE swings across seeds because each seed draws a different
-held-out split, shifting every condition at once. Raw means with across-seed error bars
-would understate the effect. All conditions within a seed see an identical split and
-identical eval windows, so we report **paired** differences.
-
----
-
-## Four things we found in the data
-
-**We priced the gate where it actually fires.** On microagi, hold out a random quarter and
-train with and without the runaway episodes. Matched on *episode count* the gate looks harmful
-(+1.68%, 1/10 seeds) — but that is an artefact, because a runaway episode carries 60× the
-frames and the ungated arm was training on twice the data. Matched on *frames*, the gate wins
-**10/10 seeds at −4.66% Avg-MSE** (p = 0.002). The long episodes were never better data, just
-more of it.
-
-**We renamed a rule rather than deleting it, once we worked out what it actually measures.**
-It began as "hands out of frame" and that claim was wrong: the flagged episodes had hands in
-plain view. Three ways of asking "is the hand visible" all fail on this fisheye footage —
-pinhole projection and fisheye projection each put **0 of 42** keypoints inside the image
-(`scripts/22_projection_check.py`), and MediaPipe run on the pixels finds hands in only 59% of
-frames, missing them entirely on 36 episodes that plainly have them
-(`scripts/24_hand_visibility.py`).
-
-What survives is the part that needs no lens model: the **angle between the hand and the
-camera's optical axis**. It splits `rl2` cleanly — most episodes near 19°, a tail near 57° —
-and the tail really does show the demonstrator working at the bottom edge of the view. So the
-rule claims the hands were held far off-axis, which is checkable against the frames, and not
-that they were invisible, which we cannot support. It fires on **6.5%** of `rl2`. The six surviving rules use durations, distances and NaN counts only, touch no camera
-geometry, and therefore compare cleanly across labs.
-
-**Episode segmentation is wildly inconsistent between labs, and the gate can see it.**
-`rl2` drops 1 episode in 572. `mecka` drops 1.2%. `microagi` — the largest fold_clothes
-slice at 9,896 episodes — drops **13.9%**, all of them recordings running more than 3× that
-lab's median episode length. One in seven "episodes" there is a whole folding session rather
-than a single demonstration.
-
-**Zarr arrays are zero-padded to a chunk boundary.** The true length is `total_frames` in
-the group attrs. Read the raw array without truncating and you get a run of identical
-trailing frames that looks exactly like a frozen tracker. Our frozen-tracker count is
-zero *because* we truncate — without that step it would have been near 100% and the gate
-would have discarded the entire dataset.
-
-**Images cost 84.6 GB for this slice; pose arrays cost 2.3 GB.** So every signal here is
-derived from poses and keypoints alone. That was a deliberate constraint, not a
-shortcut: a curation engine that costs more to run than the training it is supposed to
-save is not worth running.
-
-**An "episode" is not a common unit across labs.** Median episode duration is **93 s in
-`rl2`** and **6.6 s in `mecka`** — a factor of ~14. `rl2` episodes are long multi-fold
-sessions; `mecka` episodes are short single-action clips. Anyone budgeting curation in
-episode counts across labs is comparing incommensurable units: a subset of "1,000
-episodes" means wildly different things depending on where it came from. Budgeting in
-frames or seconds is the safer default.
-
-Both labs are clean on tracking dropout and frozen trackers — **0.0% in each**. That is a
-real finding about EgoVerse, not a null result: the pose pipelines are solid, and a gate
-built around imagined tracking failures would find nothing to do.
-
----
-
-## Limitations
-
-Stated up front, because they are the first things worth attacking.
-
-1. **Avg-MSE is a proxy, not robot success.** The EgoVerse authors use it while saying so:
-   *"this metric does not directly measure downstream robot performance [but] provides a
-   stable signal for comparing generalization."* We adopt it on exactly those terms.
-2. **The proxy policy is proprioceptive, not visual** — a consequence of the 84.6 GB
-   figure above. A visual policy might rank subsets differently.
-3. **One task, one lab.** No claim of transfer across tasks. The slice was forced by
-   metadata availability, not chosen for favourability.
-4. **Small effect, small pool.** ~4% on a few hundred episodes. The positive control is
-   what makes it interpretable rather than decorative.
-5. **The one gate rule that still fires, we cannot validate.** "Hands out of frame" matters
-   for a policy that consumes pixels. Ours does not, and the hand *pose* stays valid when a
-   hand leaves the RGB frame (Aria tracks hands from its SLAM cameras). So our own metric
-   cannot tell us whether that rule earns its place.
-6. **Facility location was our a priori pick and it lost.** `dpp` and `kcenter` both beat
-   it. We report that rather than quietly promoting the winner to headline method: on
-   this slice *spread* seems to matter slightly more than *coverage*. `dpp` is cleanly
-   ahead of `curated`, but `dpp` and `kcenter` are within noise of each other.
-
----
-
-## Deliverables
-
-| | |
+| Check | Threshold |
 |---|---|
-| Keep/drop recommendations | [`reports/keep_drop.csv`](reports/keep_drop.csv) — per-episode, with reason |
-| Gate audit | [`reports/gate_audit.csv`](reports/gate_audit.csv) — per-rule prevalence |
-| Cross-lab audit | [`reports/cross_lab_summary.csv`](reports/cross_lab_summary.csv) — rl2 vs mecka |
-| Validation report | [`reports/validation.md`](reports/validation.md) |
-| **Summary slide (submission)** | [`reports/egoscore_summary_slide.png`](reports/egoscore_summary_slide.png) · [PDF](reports/egoscore_summary_slide.pdf) |
-| Raw results | [`reports/results.csv`](reports/results.csv), [`reports/paired_deltas.csv`](reports/paired_deltas.csv) |
-| Figures | [`reports/figs/`](reports/figs) |
+| Position data missing or non-numeric | in more than 5% of frames |
+| Position repeats identically | for more than 2 seconds |
+| Hand jumps between frames | faster than 10 m/s — folding laundry, a hand moves under 2 m/s |
+| Head jumps between frames | faster than 20 m/s, which is the head-tracking solver resetting |
+| Clip too short to contain a task | under 3 seconds |
+| Hands barely move | under 10 cm of total travel |
+| Clip far longer than normal for its lab | over 3× that lab's median length |
+| Hands held out to one side | more than 45° from the camera's centre line, for most of the clip |
 
-## Reproducing
+On the collection we test against, this removes **49 of 572** clips. On the largest collection
+in EgoVerse it removes **1 in 7**.
 
-The EgoVerse README publishes read-only AWS keys for public dataset access. Put them in
-`~/.egoverse_aws_credentials` in aws-credentials format, then:
+### 2 · Select a varied subset of the rest
+
+Each clip is summarised as 41 numbers describing how the person moved: distance and speed of
+each hand, the volume of space each hand swept through, how strongly the two hands moved
+together, how far the fingers spread, and how much the head turned.
+
+Two clips are treated as similar when those numbers are close. We then compare four ways of
+choosing a subset of fixed size:
+
+| Method | What it optimises |
+|---|---|
+| **Log-determinant** | the volume the chosen clips span, so no two selections are redundant |
+| **k-center** | repeatedly takes the clip furthest from everything chosen so far |
+| **Facility location** | ensures every clip in the library has a similar one in the chosen set |
+| **Random** | the baseline all three must beat |
+
+### 3 · Measure whether the choice helped
+
+Train an identical small model on each subset. Show it 10 frames of where both hands have been
+and ask it to predict their positions over the next 30 frames — one second. Score it by squared
+error against what the person actually did, on clips the model never trained on.
+
+The held-out clips come from **people and rooms absent from training**, so the score reflects
+generalisation rather than memorisation.
+
+---
+
+## Results
+
+Each method was compared against random selection using the same budget, the same held-out
+clips, and the same model settings. 10 repeats × 2 budget sizes × 2 held-out conditions =
+**40 paired comparisons** per method.
+
+| Selection method | Comparisons won | Prediction error vs random |
+|---|---|---|
+| **Log-determinant** | **40 / 40** | **3.5% lower** |
+| k-center | 40 / 40 | 3.4% lower |
+| Facility location | 33 / 40 | 2.1% lower |
+| Random, without the filtering step | 24 / 40 | no measurable difference |
+| **Deliberately narrow** *(designed to fail)* | **1 / 40** | **5.8% higher** |
+
+![how each method scored against random](reports/figs/paired.png)
+
+### Why a 3.5% difference is credible
+
+The margin is small, so the natural concern is that the measurement is too noisy to distinguish
+anything and the result is chance. To test that, we included a selection **designed to fail**:
+the same number of clips, drawn almost entirely from a handful of people in a handful of rooms.
+
+It lost 39 of 40 comparisons. The EgoVerse authors had independently shown that variety in
+demonstrators and scenes improves generalisation, and our measurement reproduces that finding.
+It can therefore distinguish a good selection from a poor one, which makes the smaller margins
+above measurements rather than noise.
+
+### The result is not an artefact of our settings
+
+We repeated the full comparison across nine configurations of the scoring model, varying its
+capacity, regularisation, how much history it sees, and how far ahead it predicts. Nothing was
+re-tuned to favour any method. The ordering held in every configuration: log-determinant beat
+random in **9 of 9**, and the deliberately narrow selection in **0 of 9**.
+
+---
+
+## What this does not show
+
+**Training on the full collection remains the best option.** It outperforms every subset we
+selected, including the strongest one. Choosing well does not substitute for having more.
+
+The useful claim is narrower: at a quarter of the data, a varied selection recovers roughly
+**45%** of the difference between a random quarter and the full collection. That figure is what
+matters when the full collection is not an option — deciding what to record next, what to pay
+for annotation, or what will fit on a robot.
+
+---
+
+## Three findings about EgoVerse
+
+**A "clip" is not a consistent unit across labs.** Median clip length is 90 seconds in one
+collection and 11 seconds in another. In the largest collection, **1 in 7** clips is a complete
+folding session stored as a single file. A request for "1,000 clips" therefore returns very
+different quantities of footage depending on the source; requesting hours is safer.
+
+We measured what those long clips contribute. Matched on **clip count**, removing them appears
+harmful — 1.7% worse. That comparison is confounded: a single long clip contains roughly sixty
+times the footage of a normal one, so the arm that retained them trained on twice as much
+material. Matched on **footage**, removing them wins 10 comparisons out of 10, **4.7% better**.
+The long clips were never better training data; there was simply more of it.
+
+**Stored arrays are padded with blank frames.** Each clip is extended to a fixed block size, and
+the true length is recorded separately. Read without trimming, every clip appears to have frozen
+tracking at the end — which would have caused our checks to discard the entire library.
+
+**Video is expensive; recorded positions are not.** The video for our test collection is 84.6 GB;
+the recorded hand and head positions are 2.3 GB. Every signal here is computed from positions
+alone, deliberately: a filtering step that costs more to run than the training it saves is not
+worth running.
+
+---
+
+## Running it
+
+EgoVerse publishes read-only credentials for public dataset access in its own README. Place them
+in `~/.egoverse_aws_credentials`:
+
+```
+[default]
+aws_access_key_id = <key from the EgoVerse README>
+aws_secret_access_key = <secret from the EgoVerse README>
+region = us-east-2
+```
+
+Then:
 
 ```bash
 bash scripts/run_all.sh
 ```
 
-Runtime ≈ 15 minutes, dominated by the 1.2 GB pose pull.
+This reproduces every number in this README from scratch in roughly 35 minutes, most of which is
+downloading. Outputs are written to `reports/`.
 
-## Layout
+---
+
+## Repository layout
 
 ```
 egoscore/
-  access.py     Postgres + R2 access (no torch dependency)
-  features.py   quality signals + embedding features from poses
-  gate.py       the quality gate and its audit table
-  select.py     random / facility-location / DPP / k-center / degenerate
-  proxy.py      ridge action-chunk policy and Avg-MSE
-scripts/        01..10, run in order; run_all.sh does the whole thing
-reports/        outputs, figures, validation report
+  access.py     connects to the EgoVerse database and object storage
+  features.py   per-clip quality signals and the 41 descriptive features
+  gate.py       the eight checks, their thresholds, and the rejection reasons
+  select.py     the four selection methods, plus the one designed to fail
+  proxy.py      the small model used to score each subset
+scripts/        numbered and run in order; run_all.sh executes the full pipeline
+reports/        results, figures, the full write-up, and the summary slide
+demo/           the interactive demo and the slides
 ```
+
+| Output | Contents |
+|---|---|
+| [`reports/keep_drop.csv`](reports/keep_drop.csv) | every clip, kept or rejected, with the reason |
+| [`reports/validation.md`](reports/validation.md) | full write-up with all statistics |
+| [`reports/egoscore_summary_slide.png`](reports/egoscore_summary_slide.png) | one-page summary |
+| [`reports/results.csv`](reports/results.csv) | every comparison, unaggregated |
+
+---
+
+## Limitations
+
+**The score is a proxy for policy quality, not robot success.** It measures how accurately a
+model predicts human hand motion. It does not establish that a robot trained on the selected
+subset completes more tasks. The EgoVerse authors use the same proxy for the same reason and say
+so explicitly in their paper.
+
+**The scoring model does not see the video.** This follows from the 84.6 GB figure above. A
+vision-conditioned model might rank these subsets differently, and our measurement could not
+detect that.
+
+**One task, one collection.** We tested clothes-folding within a single lab's data. Transfer to
+other tasks or collections is untested. That collection was not chosen because it favoured the
+result — it is the only one that records which person filmed each clip and in which room, which
+the held-out comparison requires.
+
+**One check is measurable, one is not.** The filtering step demonstrably pays off where clips are
+inconsistent (4.7% better on the largest collection). But the off-axis rule concerns how well the
+task is *visible*, and since the scoring model does not use images, we cannot quantify its value.
+
+**One check was wrong, and we caught it late.** That rule originally flagged clips where the hands
+leave the frame. Three separate methods for determining that disagreed with what the frames
+plainly showed — the camera is a fisheye at a steep angle, and standard projection models do not
+handle it. The rule now claims only what is verifiable: the hands were held far off the camera's
+centre line. `scripts/22_projection_check.py` and `scripts/24_hand_visibility.py` are the failed
+attempts, retained rather than deleted.
+
+**Our expected winner lost.** Facility location was the method we set out to use; log-determinant
+and k-center both beat it. It remains in the results table.
+
+---
 
 ## License
 
