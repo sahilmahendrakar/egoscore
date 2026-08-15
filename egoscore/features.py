@@ -18,11 +18,31 @@ import numpy as np
 
 FPS = 30.0
 
-# NOTE: we deliberately compute nothing from camera geometry. An earlier version projected
-# hand keypoints into the image to measure "hands out of frame"; two different projection
-# models both put zero keypoints inside the frame on images where the hands are obviously
-# visible (scripts/22_projection_check.py), so the signal was removed rather than guessed at
-# again. Everything below uses durations, distances and motion only.
+# Hands beyond this angle from the optical axis are "peripheral" -- the demonstrator is
+# working out to the side of where the camera points. Set from the rl2 distribution, which
+# is bimodal: most episodes sit near 19 deg, a tail sits near 57 deg.
+OFFAXIS_DEG = 45.0
+
+# Aria gen1 focal length, verified constant across the rl2 slice by
+# scripts/12_verify_intrinsics.py (80 episodes, one distinct value).
+ARIA_F = 266.50860444
+
+# WHAT THIS DOES AND DOES NOT MEASURE.
+#
+# We compute the angle between the hand and the camera's optical axis. That angle is well
+# defined and needs no assumption about image size, principal point, or lens model -- it is
+# just atan2(|xy|, forward) on the stored keypoints, and it is large for some episodes and
+# small for most.
+#
+# What we deliberately do NOT claim is that a large angle means "the hand is outside the
+# image". We tried three ways to establish that and all three failed: pinhole projection,
+# equidistant-fisheye projection (scripts/22_projection_check.py), and MediaPipe run directly
+# on the pixels (scripts/24_hand_visibility.py). On frames where hands are plainly visible,
+# the first two put every keypoint outside the frame and the third detects nothing.
+#
+# So the signal is reported as what it is: the hand is held far to the side of where the
+# camera is pointing. That is checkable by eye -- those episodes show the demonstrator
+# working at the edge of the field of view -- and it is a real property of the episode.
 
 
 def _finite(a: np.ndarray) -> np.ndarray:
@@ -99,6 +119,28 @@ def quality_signals(ep: dict[str, np.ndarray]) -> dict:
         frozen_runs.append(run)
     out["frozen_frac_max"] = float(max(frozen_fracs)) if frozen_fracs else 1.0
     out["frozen_run_max_s"] = float(max(frozen_runs)) / FPS if frozen_runs else 0.0
+
+    # --- hand position relative to the camera axis -------------------------
+    # See the note at the top of this file for what this does and does not mean.
+    offaxis = []
+    for name, a in [("left", lkp), ("right", rkp)]:
+        if a is None or len(a) == 0:
+            out[f"offaxis_{name}"] = 1.0
+            out[f"offaxis_deg_{name}"] = 90.0
+            offaxis.append(1.0)
+            continue
+        k = _kp(np.nan_to_num(a))
+        hand = k.mean(axis=1)                      # centroid of the 21 keypoints
+        fwd = -hand[:, 2]                          # z is negative in the stored frame
+        rad = np.linalg.norm(hand[:, :2], axis=1)
+        theta = np.degrees(np.arctan2(rad, fwd))   # angle from the optical axis
+        out[f"offaxis_deg_{name}"] = float(np.median(theta))
+        frac = float((theta > OFFAXIS_DEG).mean())
+        out[f"offaxis_{name}"] = frac
+        offaxis.append(frac)
+    out["offaxis_max"] = float(max(offaxis))
+    out["offaxis_deg_max"] = float(max(out.get("offaxis_deg_left", 0.0),
+                                       out.get("offaxis_deg_right", 0.0)))
 
     # --- motion -----------------------------------------------------------
     speeds = []

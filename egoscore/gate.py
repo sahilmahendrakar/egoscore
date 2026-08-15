@@ -13,24 +13,26 @@ import pandas as pd
 
 # Absolute rules: these describe broken data, not unusual data.
 #
-# NOTE ON A REMOVED RULE. We previously had a `hands_out_of_frame` rule that projected the
-# hand keypoints into the image and flagged episodes where they landed outside it. It is
-# gone, because we could not establish the correct keypoint-to-pixel mapping.
+# A NOTE ON THE OFF-AXIS RULE. This started life as "hands out of frame" and that claim was
+# wrong: we could never establish the keypoint-to-pixel mapping, and three separate attempts
+# (pinhole, fisheye, MediaPipe on the pixels) all disagree with what the frames plainly show.
 #
-# Two projection models were tried and both are refuted by simply drawing the result on
-# the frames (scripts/22_projection_check.py): treating the keypoints as camera-frame
-# points, and transforming them by the head pose first. Under both, *zero* of the 42
-# keypoints land inside the image on frames where the hands are plainly visible. Something
-# about the stored convention is not what we assumed, and rather than ship a third guess we
-# removed the rule. Any number it produced would have been unfounded.
+# The underlying measurement is sound, so it is kept under an accurate name. The angle
+# between the hand and the camera's optical axis needs no lens model, and it separates the
+# slice cleanly: most rl2 episodes sit around 19 deg, a tail sits around 57 deg. Those
+# episodes really do show the demonstrator working out at the edge of the view.
 #
-# The remaining rules use only durations, motion magnitudes and NaN counts. None of them
-# depend on camera geometry, so none of them are affected.
+# The claim is "the hands are far off-axis", which is checkable. It is not "the hands are
+# invisible", which we cannot support.
 HARD_RULES = [
     ("tracking_dropout", "nan_max", 0.05, "gt", "non-finite pose/keypoint values in >5% of frames"),
     ("frozen_tracker", "frozen_run_max_s", 2.0, "gt", "pose held bit-identical for >2s (tracker dropout)"),
     ("too_short", "duration_s", 3.0, "lt", "shorter than 3s — cannot contain a fold"),
     ("no_motion", "path_len_total", 0.10, "lt", "hands travelled <10cm in total"),
+    # Named for what it measures, not for what we first assumed it meant. See the note in
+    # features.py: the angle is solid, the claim "therefore out of frame" is not.
+    ("hands_far_off_axis", "offaxis_max", 0.50, "gt",
+     "a hand is held >45 deg off the camera axis for most of the episode"),
 ]
 
 # Relative rules, scaled to the slice's own typical episode.

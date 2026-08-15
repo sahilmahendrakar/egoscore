@@ -15,19 +15,19 @@
 
 | Selector | Paired wins vs random | Mean Avg-MSE change | Wilcoxon p |
 |---|---|---|---|
-| `dpp` | 40/40 | **-3.77%** | 1.8e-12 |
-| `kcenter` | 37/40 | **-3.44%** | 6.0e-11 |
-| `curated` | 36/40 | **-2.39%** | 1.4e-09 |
-| `random_nogate` | 10/40 | **+0.16%** | 3.0e-01 |
-| `degenerate` | 1/40 | **+7.01%** | 1.3e-11 |
+| `dpp` | 40/40 | **-3.96%** | 1.8e-12 |
+| `kcenter` | 39/40 | **-3.56%** | 3.6e-12 |
+| `curated` | 35/40 | **-2.24%** | 5.6e-10 |
+| `random_nogate` | 24/40 | **-0.76%** | 8.9e-02 |
+| `degenerate` | 1/40 | **+6.60%** | 3.6e-12 |
 
 Paired: each selector is compared to `random` at the *same seed and the same budget*,
 evaluated on the *same* held-out windows. 40 comparisons = 10 seeds x 2
 budgets x 2 held-out axes. Wilcoxon signed-rank on the paired differences, two-sided.
 
-- **Diversity-based selection wins consistently.** `dpp` wins 40/40 paired comparisons at -3.77% Avg-MSE (p=2e-12); `kcenter` 37/40; facility location (`curated`) 36/40.
-- **The quality gate does *not* measurably help on this slice.** `random_nogate` is 10/40 at +0.16%, sign-test p=0.00 — indistinguishable from no effect. That makes sense: the gate drops 1 of 572 `rl2` episodes, so there is almost nothing for filtering to remove. On `microagi` the same gate drops 15.9%, where it would presumably matter — but `microagi` has no operator or scene labels, so the experiment cannot be run there. **Selection matters here; filtering has nothing to bite on.**
-- **The positive control fires.** `degenerate` — the same budget concentrated into as few operator x scene groups as possible — loses 1/40 at +7.01% (p=1e-11). See below for why this matters more than the headline.
+- **Diversity-based selection wins consistently.** `dpp` wins 40/40 paired comparisons at -3.96% Avg-MSE (p=2e-12); `kcenter` 39/40; facility location (`curated`) 35/40.
+- **The quality gate does *not* measurably help on this slice.** `random_nogate` is 24/40 at -0.76%, sign-test p=0.27 — indistinguishable from no effect. That makes sense: the gate drops 38 of 572 `rl2` episodes, so there is almost nothing for filtering to remove. On `microagi` the same gate drops 15.9%, where it would presumably matter — but `microagi` has no operator or scene labels, so the experiment cannot be run there. **Selection matters here; filtering has nothing to bite on.**
+- **The positive control fires.** `degenerate` — the same budget concentrated into as few operator x scene groups as possible — loses 1/40 at +6.60% (p=4e-12). See below for why this matters more than the headline.
 
 ## Why the positive control is the most important row
 
@@ -40,12 +40,12 @@ So we included a condition that *should* lose, for a reason established independ
 the EgoVerse paper: demonstrator and scene diversity improve generalization. `degenerate`
 spends the identical budget but concentrates it into a handful of operator x scene groups.
 
-At K=25% it is **+14.9%** on unseen operators and **+8.3%** on unseen scenes — a large, unambiguous, correctly-signed effect.
+At K=25% it is **+13.5%** on unseen operators and **+7.6%** on unseen scenes — a large, unambiguous, correctly-signed effect.
 
 That tells us the harness *can* detect a diversity effect of the kind the paper reported.
 The smaller curated-vs-random margin is therefore a measurement, not noise masquerading as one.
 
-Note the control weakens at K=50% (+2.0% / +2.8%), exactly as it should: at half the pool you cannot concentrate the budget very much, so `degenerate` converges toward `random`. A control that stayed constant would have been suspicious.
+Note the control weakens at K=50% (+2.9% / +2.5%), exactly as it should: at half the pool you cannot concentrate the budget very much, so `degenerate` converges toward `random`. A control that stayed constant would have been suspicious.
 
 ## The caveat we are not burying
 
@@ -54,13 +54,13 @@ every 25% and 50% subset, including ours:
 
 | | unseen operator | unseen scene |
 |---|---|---|
-| random, K=25% | 0.11282 | 0.10173 |
-| best selector (dpp), K=25% | 0.10677 | 0.09633 |
-| **all gated data (100%)** | **0.10160** | **0.09142** |
+| random, K=25% | 0.11456 | 0.10386 |
+| best selector (dpp), K=25% | 0.10857 | 0.09770 |
+| **all gated data (100%)** | **0.10223** | **0.09202** |
 
 The honest framing is therefore *not* "throw away 75% of your data for free." It is:
 
-> At a quarter of the budget, diversity-aware selection closes **54%** (unseen operator) / **52%** (unseen scene) of the gap between a random quarter and using everything.
+> At a quarter of the budget, diversity-aware selection closes **49%** (unseen operator) / **52%** (unseen scene) of the gap between a random quarter and using everything.
 
 That is the useful claim for someone deciding what to label, transfer, or train on next.
 
@@ -88,7 +88,7 @@ an identical split and identical evaluation windows, we report **paired** differ
 
 ## Quality gate
 
-1/572 episodes dropped (0.2%).
+38/572 episodes dropped (6.6%).
 
 | rule               | signal           | test                  |   n_flagged |      pct | meaning                                                                          |
 |:-------------------|:-----------------|:----------------------|------------:|---------:|:---------------------------------------------------------------------------------|
@@ -96,9 +96,10 @@ an identical split and identical evaluation windows, we report **paired** differ
 | frozen_tracker     | frozen_run_max_s | gt 2.0                |           0 | 0        | pose held bit-identical for >2s (tracker dropout)                                |
 | too_short          | duration_s       | lt 3.0                |           0 | 0        | shorter than 3s — cannot contain a fold                                          |
 | no_motion          | path_len_total   | lt 0.1                |           0 | 0        | hands travelled <10cm in total                                                   |
+| hands_far_off_axis | offaxis_max      | gt 0.5                |          37 | 6.46853  | a hand is held >45 deg off the camera axis for most of the episode               |
 | runaway_length     | duration_s       | gt 3.0x median (278s) |           0 | 0        | more than 3x the median episode length — an un-segmented recording, not one demo |
 | suspiciously_short | duration_s       | lt 0.15x median (14s) |           1 | 0.174825 | under 15% of the median episode length — a fragment, not a demo                  |
-| ANY (dropped)      | -                | -                     |           1 | 0.174825 | union of all rules over 572 episodes                                             |
+| ANY (dropped)      | -                | -                     |          38 | 6.64336  | union of all rules over 572 episodes                                             |
 
 **What this says about the data:** `rl2` flagship data is essentially spotless — 1 episode
 in 572. Zero have non-finite poses; zero have a frozen tracker. A gate designed around

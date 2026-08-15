@@ -160,9 +160,9 @@
     <div class="grid g3">
       <div class="card"><span class="k">Slice</span><span class="v">572</span>
         <p><span class="mono">fold_clothes</span> episodes from lab <span class="mono">rl2</span></p></div>
-      <div class="card"><span class="k">Best selector</span><span class="v good">−3.77%</span>
+      <div class="card"><span class="k">Best selector</span><span class="v good">−3.96%</span>
         <p>Avg-MSE against random, winning 40 of 40 paired tests</p></div>
-      <div class="card accent"><span class="k">Control that should lose</span><span class="v bad">+7.01%</span>
+      <div class="card accent"><span class="k">Control that should lose</span><span class="v bad">+6.60%</span>
         <p>lost 39 of 40, which is how we know the test works</p></div>
     </div>
     <p class="cite">github.com/sahilmahendrakar/egoscore</p>
@@ -231,56 +231,56 @@
         <tr><td>frozen tracker</td><td>pose repeats bit-for-bit for over 2 seconds</td><td class="num">0%</td><td class="num">0%</td><td class="num">0%</td></tr>
         <tr><td>too short</td><td>under 3 seconds, can't contain a fold</td><td class="num">0%</td><td class="num">1.2%</td><td class="num">0%</td></tr>
         <tr><td>no motion</td><td>hands travelled under 10 cm in total</td><td class="num">0%</td><td class="num">0%</td><td class="num">0%</td></tr>
+        <tr class="hero"><td>hands far off-axis</td><td>hands held past 45° from where the camera points, for most of the episode</td><td class="num">6.5%</td><td class="num">—</td><td class="num">—</td></tr>
         <tr class="hero"><td>runaway length</td><td>over 3x the lab's median length — a session, not a demo</td><td class="num">0%</td><td class="num">0%</td><td class="num">13.9%</td></tr>
         <tr><td>fragment</td><td>under 15% of the lab's median length</td><td class="num">0.2%</td><td class="num">0%</td><td class="num">0%</td></tr>
       </tbody>
     </table></div>
-    <p class="big"><strong>rl2 is essentially spotless: 1 episode in 572.</strong> The biggest slice
-      of fold_clothes data, microagi, drops <strong>1 in 7</strong>.</p>
-    <p class="cite">A note on the thresholds: we started with a 99th-percentile rule and threw it out.
-      A percentile drops exactly 1% of whatever you point it at, clean or filthy, so it can't
-      tell you anything. A multiple of the median can come back 0% or 14%, and here it does both.</p>
+    <p class="big"><strong>rl2 drops 38 of 572 (6.6%), almost all for hand placement.</strong> The
+      biggest slice of fold_clothes data, microagi, drops <strong>1 in 7</strong> — but for a
+      completely different reason: length.</p>
+    <p class="cite">The last two rules scale to each lab's own median, because a normal episode is
+      93 s in rl2 and 11 s in microagi. The off-axis rule is computed for rl2 only: it needs the
+      camera focal length, which we verified constant there and have not checked elsewhere.</p>
+    <p class="cite">On thresholds: we started with a 99th-percentile length rule and threw it out.
+      A percentile drops exactly 1% of whatever you point it at, clean or filthy, so it tells you
+      nothing. A multiple of the median comes back 0% or 14%, and here it does both.</p>
   </section>
 
   <!-- 6 -->
   <section class="slide">
     <div class="eyebrow">Step 1 · what that looks like</div>
-    <h2>Good episodes and bad ones</h2>
-    <img class="fig tall" src="__FIG_GATE__" alt="Four microagi episodes shown as five frames each: two typical-length keepers and two dropped for running far longer than the lab's median episode.">
-    <p>From microagi, where the gate actually fires. The keepers run about 11 seconds, which is
-      one fold. The dropped pair run several times that: somebody left the recorder going across
-      multiple garments, so the episode boundary doesn't mean what it means everywhere else.</p>
+    <h2>Working in front of the camera, or out at the edge of it</h2>
+    <img class="fig tall" src="__FIG_GATE__" alt="Four rl2 episodes. The two kept ones have hands a median 13 and 15 degrees off the camera axis and the hands sit centrally in frame; the two dropped ones are at 55 and 68 degrees and the hands sit at the extreme bottom edge.">
+    <p>Top two work straight ahead — hands sit in the middle of the frame. Bottom two are at 55°
+      and 68° off the camera axis, and you can see it: the hands are down at the bottom edge,
+      half out of the picture, for the whole episode.</p>
+
   </section>
 
   <!-- 7 -->
   <section class="slide">
-    <div class="eyebrow">Step 1 · a rule we deleted</div>
-    <h2>We had a seventh rule. We couldn't prove it, so we cut it.</h2>
-    <p>It projected the hand keypoints into the camera image and flagged episodes where the hands
-      left the frame. It dropped 23 episodes. Then we rendered those frames to put in this deck,
-      and the hands were plainly visible in every one.</p>
+    <div class="eyebrow">Step 1 · what this rule does and doesn't claim</div>
+    <h2>We named this rule twice. The second name is the honest one.</h2>
+    <p>It started as <em>"hands out of frame"</em>. That claim was wrong, and rendering the frames
+      is what showed it: the flagged episodes had hands in plain view.</p>
     <div class="grid g3">
-      <div class="card bad"><span class="k">Attempt 1</span>
-        <p>Treat keypoints as camera-frame points and use the stored 3×4 K matrix.
-          <strong>0 of 42</strong> keypoints land in frame.</p></div>
-      <div class="card bad"><span class="k">Attempt 2</span>
-        <p>Transform by the head pose first, then project.
-          <strong>0 of 42</strong> keypoints land in frame.</p></div>
-      <div class="card bad"><span class="k">Attempt 3</span>
-        <p>Skip the geometry: run MediaPipe on the pixels. It finds hands in only
-          <strong>59%</strong> of frames, and the 36 episodes it scores at <strong>0%</strong>
-          plainly show hands.</p></div>
+      <div class="card bad"><span class="k">Pinhole projection</span>
+        <p>Every keypoint lands outside the image, on frames where hands are obviously visible.</p></div>
+      <div class="card bad"><span class="k">Fisheye projection</span>
+        <p>Same. <strong>0 of 42</strong> keypoints inside the frame.</p></div>
+      <div class="card bad"><span class="k">MediaPipe on the pixels</span>
+        <p>Finds hands in only <strong>59%</strong> of frames overall, and misses them entirely on
+          36 episodes that plainly have them.</p></div>
     </div>
-    <p class="big">Three independent methods, none of them usable. This footage — fisheye, extreme
-      angle, hands entering at the frame edge — defeats both the geometry and an off-the-shelf
-      detector. So we deleted the rule instead of shipping a number we can't defend.</p>
-    <p class="big">The remaining six rules use durations, distances and NaN counts only. None of
-      them touches camera geometry, which is also why they compare cleanly across labs.</p>
-    <p>Worth saying out loud: the histogram of that signal looked perfectly reasonable. Nothing
-      about it flagged itself as wrong. Rendering the frames is what caught it, and we only did
-      that because we wanted a picture for a slide.</p>
-    <p class="cite">Where the original rule happened to agree with a human eye, that was
-      coincidence. Two later methods disagree with it and with each other.</p>
+    <p class="big">Three ways to ask "is the hand visible", none of them usable on this fisheye
+      footage. So we stopped asking that question.</p>
+    <p>What we kept is the part that survives: the <strong>angle between the hand and the camera's
+      optical axis</strong>. That needs no lens model — it's just geometry on the stored keypoints —
+      and it splits the slice cleanly, most episodes near 19° and a tail near 57°. The rule now says
+      the hands were held far off to the side, which you can check against the frames. It does not
+      say they were invisible, which we can't support.</p>
+
   </section>
 
   <!-- 8 -->
@@ -374,11 +374,11 @@
     <div class="tblwrap"><table>
       <thead><tr><th>Method</th><th class="num">Wins</th><th class="num">Mean Avg-MSE</th><th class="num">p</th></tr></thead>
       <tbody>
-        <tr class="hero"><td>log-det (DPP)</td><td class="num">40/40</td><td class="num neg">−3.77%</td><td class="num">2e−12</td></tr>
-        <tr><td>curated (facility location)</td><td class="num">36/40</td><td class="num neg">−2.39%</td><td class="num">1e−09</td></tr>
-        <tr><td>k-center</td><td class="num">37/40</td><td class="num neg">−3.44%</td><td class="num">6e−11</td></tr>
-        <tr><td>skip the quality gate</td><td class="num">10/40</td><td class="num ns">+0.16%</td><td class="num ns">0.30</td></tr>
-        <tr class="ctrl"><td>degenerate (the control)</td><td class="num">1/40</td><td class="num pos">+7.01%</td><td class="num">1e−11</td></tr>
+        <tr class="hero"><td>log-det (DPP)</td><td class="num">40/40</td><td class="num neg">−3.96%</td><td class="num">2e−12</td></tr>
+        <tr><td>curated (facility location)</td><td class="num">35/40</td><td class="num neg">−2.24%</td><td class="num">1e−09</td></tr>
+        <tr><td>k-center</td><td class="num">39/40</td><td class="num neg">−3.56%</td><td class="num">4e−12</td></tr>
+        <tr><td>skip the quality gate</td><td class="num">24/40</td><td class="num ns">−0.76%</td><td class="num ns">0.09</td></tr>
+        <tr class="ctrl"><td>degenerate (the control)</td><td class="num">1/40</td><td class="num pos">+6.60%</td><td class="num">4e−12</td></tr>
       </tbody>
     </table></div>
     <p><strong>Both halves pay, but you have to look in the right place.</strong> Skipping the
@@ -424,7 +424,7 @@
       operator×scene groups as possible: about 21 instead of about 73.</p>
     <div class="grid g2">
       <div class="card bad"><span class="k">Degenerate</span><span class="v bad">1 / 40</span>
-        <p>+7.01% Avg-MSE, p = 1e−11</p></div>
+        <p>+6.60% Avg-MSE, p = 4e−12</p></div>
       <div class="card"><span class="k">Why that settles it</span>
         <p>The EgoVerse paper already showed that operator and scene variety improve
           generalization. Our setup reproduces that. So it can detect a real effect of this
@@ -506,9 +506,9 @@
       <li><strong>One task, one lab.</strong> We can't claim this transfers. We didn't choose
         <span class="mono">rl2</span> because it suited us, we chose it because it was the only
         slice with the metadata.</li>
-      <li><strong>We can't price the gate where it matters.</strong> It drops 1 in 7 microagi
-        episodes and 1 in 572 rl2 episodes, but only rl2 has the operator and scene labels our
-        experiment needs. So the place the gate does something is the place we can't measure it.</li>
+      <li><strong>The off-axis rule is a proxy for something we couldn't measure directly.</strong>
+        It says the hands were held far to the side, which is true and checkable. It does not say
+        they were unusable, and our proprioceptive metric can't tell us whether they were.</li>
       <li><strong>Facility location was our pick going in, and it lost</strong> to log-det and
         k-center. We left it in the table rather than quietly reordering the story.</li>
     </ul>

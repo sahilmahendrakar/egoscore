@@ -34,7 +34,9 @@ FRAME_W = 300
 # construction; microagi is where the gate actually fires.
 LAB = sys.argv[1] if len(sys.argv) > 1 else "microagi"
 
-if LAB == "handcheck":
+if LAB == "offaxis":
+    kd = pd.read_csv(REPORTS / "keep_drop.csv").set_index("episode_hash")
+elif LAB == "handcheck":
     # Verification pass: the episodes MediaPipe says have no visible hands at all.
     hv = pd.read_csv(REPORTS / "hand_visibility_rl2.csv")
     kd = pd.read_csv(REPORTS / "keep_drop.csv").merge(hv, on="episode_hash")
@@ -57,7 +59,10 @@ meta = pd.read_csv(REPORTS / "slice_fold_clothes.csv").set_index("episode_hash")
 
 # Four rows keeps the composite landscape, which is what a 16:9 slide can actually show.
 med = kd["duration_s"].median()
-if LAB == "handcheck":
+if LAB == "offaxis":
+    kept = kd[kd["keep"]].nsmallest(2, "offaxis_deg_max").index.tolist()
+    dropped = kd[kd["rule_hands_far_off_axis"]].nlargest(2, "offaxis_max").index.tolist()
+elif LAB == "handcheck":
     kept = kd[kd["hand_visible_frac"] >= 1.0].head(1).index.tolist()
     dropped = kd[~kd["keep"]].head(3).index.tolist()
 else:
@@ -68,8 +73,9 @@ else:
     if len(dropped) < 2:
         dropped += kd[~kd["keep"]].nsmallest(2 - len(dropped), "duration_s").index.tolist()
 
+DROP_LABEL = {"offaxis": "OFF-AXIS", "handcheck": "NO HANDS?"}.get(LAB, "TOO LONG")
 ROWS = ([(h, "KEPT", "#1baf7a") for h in kept]
-        + [(h, "TOO LONG", "#e34948") for h in dropped])
+        + [(h, DROP_LABEL, "#e34948") for h in dropped])
 print(f"rendering {len(ROWS)} episodes")
 
 creds = load_creds()
@@ -127,6 +133,12 @@ import matplotlib.pyplot as plt
 
 def caption(ep, verdict):
     r = kd.loc[ep]
+    if LAB == "offaxis":
+        if verdict == "KEPT":
+            return (f"hands a median {r.offaxis_deg_max:.0f}\u00b0 off the camera axis \u00b7 "
+                    f"working straight ahead \u00b7 {r.duration_s:.0f}s")
+        return (f"hands a median {r.offaxis_deg_max:.0f}\u00b0 off the camera axis, past 45\u00b0 in "
+                f"{100*r.offaxis_max:.0f}% of frames \u00b7 working out at the edge of the view")
     if LAB == "handcheck":
         return (f"MediaPipe detected a hand in {100*r.hand_visible_frac:.0f}% of 8 sampled frames "
                 f"\u00b7 {r.duration_s:.0f}s")
@@ -146,15 +158,18 @@ def caption(ep, verdict):
 # concludes the label is wrong. The bar makes the actual reason the visual subject.
 from matplotlib.gridspec import GridSpec
 
-durs = [float(kd.loc[ep, "duration_s"]) for ep, _, _ in ROWS]
-dmax = max(durs) * 1.45   # headroom so the value label sits clear of the longest bar
-thresh = 3.0 * med
+if LAB == "offaxis":
+    durs = [float(kd.loc[ep, "offaxis_deg_max"]) for ep, _, _ in ROWS]
+    dmax, thresh, unit = 90.0, 45.0, "\u00b0"
+else:
+    durs = [float(kd.loc[ep, "duration_s"]) for ep, _, _ in ROWS]
+    dmax, thresh, unit = max(durs) * 1.45, 3.0 * med, "s"
 
 fig = plt.figure(figsize=(15.4, 2.05 * len(ROWS)), facecolor="white")
 gs = GridSpec(len(ROWS), 2, figure=fig, width_ratios=[1, 3.6], wspace=0.06, hspace=0.42)
 
 for r, (ep, verdict, color) in enumerate(ROWS):
-    dur = float(kd.loc[ep, "duration_s"])
+    dur = durs[r]
 
     axb = fig.add_subplot(gs[r, 0])
     axb.barh([0], [dur], height=0.40, color=color, zorder=3)
@@ -166,14 +181,14 @@ for r, (ep, verdict, color) in enumerate(ROWS):
     # Ticks only on the bottom row; the axis is shared conceptually and repeating it four
     # times just crowds the short bars.
     if r == len(ROWS) - 1:
-        axb.set_xticks([thresh, round(dmax / 100) * 100])
-        axb.set_xticklabels([f"{thresh:.0f}s cut-off", f"{round(dmax/100)*100:.0f}s"], fontsize=8.5)
+        axb.set_xticks([thresh, dmax])
+        axb.set_xticklabels([f"{thresh:.0f}{unit} cut-off", f"{dmax:.0f}{unit}"], fontsize=8.5)
     else:
         axb.set_xticks([])
     for sp in axb.spines.values():
         sp.set_visible(False)
     # Value pinned to the right edge so short and long bars label in the same place.
-    axb.text(dur + dmax * 0.03, 0, f"{dur:.0f}s", va="center", ha="left",
+    axb.text(dur + dmax * 0.03, 0, f"{dur:.0f}{unit}", va="center", ha="left",
              fontsize=14, fontweight="bold", color=color)
     axb.text(0, 0.92, verdict, transform=axb.transAxes, fontsize=11.5,
              fontweight="bold", color=color, va="top")
@@ -187,12 +202,18 @@ for r, (ep, verdict, color) in enumerate(ROWS):
         sp.set_color(color); sp.set_linewidth(2.2)
     axi.set_title(caption(ep, verdict), fontsize=10.3, color="#52514e", loc="left", pad=5)
 
-fig.suptitle(f"The gate drops on length, not on what any single frame shows  \u2014  lab {LAB}",
+TITLE = ("Hand position relative to where the camera is pointing  \u2014  lab rl2"
+         if LAB == "offaxis" else
+         f"The gate drops on length, not on what any single frame shows  \u2014  lab {LAB}")
+fig.suptitle(TITLE,
              fontsize=16, fontweight="bold", color="#14161a", y=0.995)
 fig.text(0.5, 0.005,
-         "Left: episode length against the 3x-median cut-off. Right: five frames spread evenly across "
-         "the episode, with timestamps. Every frame here has hands in it \u2014 that is not what the gate "
-         "is judging.",
+         ("Left: median hand angle from the optical axis, against the 45\u00b0 cut-off. Right: five frames "
+          "across the episode. The dropped pair are working out at the edge of the view rather than in "
+          "front of the camera." if LAB == "offaxis" else
+          "Left: episode length against the 3x-median cut-off. Right: five frames spread evenly across "
+          "the episode, with timestamps. Every frame here has hands in it \u2014 that is not what the gate "
+          "is judging."),
          ha="center", fontsize=10, color="#7c7b76")
 fig.tight_layout(rect=[0.005, 0.022, 1, 0.972])
 outfig = REPORTS / "figs" / "gate_examples.png"

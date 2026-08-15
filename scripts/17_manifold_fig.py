@@ -21,7 +21,7 @@ REPORTS = ROOT / "reports"
 FIGS = REPORTS / "figs"
 FIGS.mkdir(parents=True, exist_ok=True)
 
-D = json.loads((REPORTS / "demo_data.json").read_text())
+D = json.loads((REPORTS / "demo_data.json").read_text())["datasets"]["rl2"]
 eps = D["episodes"]
 xy = np.array([[e["x"], e["y"]] for e in eps])
 

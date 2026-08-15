@@ -107,15 +107,19 @@ frames and the ungated arm was training on twice the data. Matched on *frames*, 
 **10/10 seeds at −4.66% Avg-MSE** (p = 0.002). The long episodes were never better data, just
 more of it.
 
-**We deleted a rule we could not prove.** An earlier gate projected hand keypoints into the
-camera image and flagged "hands out of frame", dropping 23 episodes. Rendering those frames
-showed hands in plain view in every one. We tried two projection models — keypoints as
-camera-frame points, and keypoints transformed by the head pose first — and under both,
-**zero of 42 keypoints** land inside the image on frames where the hands are obviously
-visible (`scripts/22_projection_check.py`). A third attempt skipped the geometry entirely and
-ran MediaPipe on the pixels: it detects hands in only 59% of frames, and the 36 episodes it
-scores at 0% plainly show hands (`scripts/24_hand_visibility.py`). Three methods, none usable
-on this fisheye view, so we removed the rule. The six surviving rules use durations, distances and NaN counts only, touch no camera
+**We renamed a rule rather than deleting it, once we worked out what it actually measures.**
+It began as "hands out of frame" and that claim was wrong: the flagged episodes had hands in
+plain view. Three ways of asking "is the hand visible" all fail on this fisheye footage —
+pinhole projection and fisheye projection each put **0 of 42** keypoints inside the image
+(`scripts/22_projection_check.py`), and MediaPipe run on the pixels finds hands in only 59% of
+frames, missing them entirely on 36 episodes that plainly have them
+(`scripts/24_hand_visibility.py`).
+
+What survives is the part that needs no lens model: the **angle between the hand and the
+camera's optical axis**. It splits `rl2` cleanly — most episodes near 19°, a tail near 57° —
+and the tail really does show the demonstrator working at the bottom edge of the view. So the
+rule claims the hands were held far off-axis, which is checkable against the frames, and not
+that they were invisible, which we cannot support. It fires on **6.5%** of `rl2`. The six surviving rules use durations, distances and NaN counts only, touch no camera
 geometry, and therefore compare cleanly across labs.
 
 **Episode segmentation is wildly inconsistent between labs, and the gate can see it.**
