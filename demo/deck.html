@@ -108,9 +108,11 @@
   td.num { text-align: right; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
   tr.hero td { font-weight: 680; color: var(--ink); }
   tr.ctrl td { color: var(--drop); }
-  td.pos { color: var(--drop); font-weight: 660; }
-  td.neg { color: var(--good); font-weight: 660; }
-  td.ns  { color: var(--ink-3); }
+  /* Element+class qualified twice over, so the semantic colour still wins inside
+     tr.hero / tr.ctrl, which are more specific than a bare .neg. */
+  td.pos, tr.hero td.pos, tr.ctrl td.pos { color: var(--drop); font-weight: 660; }
+  td.neg, tr.hero td.neg, tr.ctrl td.neg { color: var(--good); font-weight: 660; }
+  td.ns,  tr.hero td.ns,  tr.ctrl td.ns  { color: var(--ink-3); }
 
   .pipe { display: flex; flex-direction: column; gap: 9px; }
   .step { display: grid; grid-template-columns: 28px 1fr; gap: 13px; align-items: start;
@@ -154,382 +156,347 @@
   <!-- 1 -->
   <section class="slide on">
     <div class="eyebrow">EgoVerse Data Optimization &amp; Evaluation Suite · Track 1</div>
-    <h1>EgoScore</h1>
-    <p class="big">We picked a quarter of EgoVerse and checked whether that quarter trained a
-      better model than a quarter picked at random. It did.</p>
+    <h1>Which training videos are worth keeping?</h1>
+    <p class="big">We took a big library of videos, threw out the broken ones, picked a varied
+      quarter of the rest, and checked whether that quarter taught a robot model better than a
+      quarter picked at random. It did.</p>
     <div class="grid g3">
-      <div class="card"><span class="k">Slice</span><span class="v">572</span>
-        <p><span class="mono">fold_clothes</span> episodes from lab <span class="mono">rl2</span></p></div>
-      <div class="card"><span class="k">Best selector</span><span class="v good">−3.53%</span>
-        <p>Avg-MSE against random, winning 40 of 40 paired tests</p></div>
-      <div class="card accent"><span class="k">Control that should lose</span><span class="v bad">+5.83%</span>
-        <p>lost 39 of 40, which is how we know the test works</p></div>
+      <div class="card"><span class="k">We tested on</span><span class="v">572</span>
+        <p>videos of people folding clothes</p></div>
+      <div class="card"><span class="k">Our pick beat random</span><span class="v good">40 / 40</span>
+        <p>times, cutting prediction error 3.5%</p></div>
+      <div class="card accent"><span class="k">A pick built to be bad</span><span class="v bad">1 / 40</span>
+        <p>lost, which is how we know the test works</p></div>
     </div>
     <p class="cite">github.com/sahilmahendrakar/egoscore</p>
   </section>
 
   <!-- 2 -->
   <section class="slide">
-    <div class="eyebrow">Picking a track</div>
-    <h2>Why we took Track 1</h2>
-    <div class="grid g3">
-      <div class="card accent"><span class="k">Track 1 — ours</span>
-        <p class="big" style="color:var(--ink)">Which episodes are worth training on?</p></div>
-      <div class="card"><span class="k">Track 2</span><p>How diverse is this subset, really?</p></div>
-      <div class="card"><span class="k">Track 3</span><p>Did the human actually succeed?</p></div>
-    </div>
-    <p>Track 3 needs labels saying which demos succeeded. EgoVerse has none. We would have
-      had to label a few hundred episodes ourselves and then score our classifier against
-      our own labels, with no second annotator to check us.</p>
-    <p>Track 1 lets us skip that. We can train a model on two different subsets and measure
-      which one does better on data neither of them saw. Nobody has to take our word for it.</p>
+    <div class="eyebrow">The problem</div>
+    <h2>More data is not automatically better data</h2>
+    <p class="big">EgoVerse is a library of videos of people doing everyday tasks, filmed from a
+      camera strapped to their head. Robots learn how to move by watching them.</p>
+    <p class="big">It holds hundreds of thousands of clips. Some are broken. Many are near-copies
+      of each other. Training on all of it is slow, and the copies teach the robot nothing new.</p>
+    <p>So: <strong>which ones are actually worth training on?</strong> Nobody can answer that
+      today without guessing. That is the question we took.</p>
   </section>
 
   <!-- 3 -->
   <section class="slide">
-    <div class="eyebrow">The question</div>
-    <h2>One sentence, written so it could come out false</h2>
-    <div class="quote">At a fixed budget of K episodes, a quality-gated, coverage-maximizing
-      subset trains a better policy than K episodes picked at random.</div>
-    <p class="big">The budget is fixed on both sides. This is never "more data wins" — it's the
-      same amount of data, chosen two different ways.</p>
-    <p>Things the sentence does not claim: anything about robot success rates, anything about
-      other tasks, anything about other labs. We'll come back to all three at the end.</p>
+    <div class="eyebrow">Why this question</div>
+    <h2>It's the one we could actually check our answer to</h2>
+    <div class="grid g3">
+      <div class="card accent"><span class="k">We chose this</span>
+        <p class="big" style="color:var(--ink)">Which videos are worth training on?</p></div>
+      <div class="card"><span class="k">Option two</span><p>How varied is this set of videos?</p></div>
+      <div class="card"><span class="k">Option three</span><p>Did the person in the video succeed?</p></div>
+    </div>
+    <p class="big">Option three needs someone to watch hundreds of videos and mark which ones
+      went well. That list doesn't exist, so we'd have had to make it ourselves — and then grade
+      our own homework against it.</p>
+    <p>Our question avoids that. Train a model on two different sets of videos, then see which
+      model does better on videos neither of them has seen. Nobody has to take our word for it.</p>
   </section>
 
   <!-- 4 -->
   <section class="slide">
-    <div class="eyebrow">Before any modelling</div>
-    <h2>Most of EgoVerse can't answer this question</h2>
-    <p>To show a subset generalizes you need to hold something out. We hold out operators we
-      never trained on and scenes we never trained on. That needs a lab where several people
-      each recorded in several rooms. Only one lab has that.</p>
+    <div class="eyebrow">Before we could start</div>
+    <h2>Most of the library can't answer this question</h2>
+    <p>To prove a set of videos is <em>better</em>, you have to test the model on people and
+      rooms it never trained on. That means you need a collection where several different
+      people filmed in several different rooms, and where somebody wrote down who and where.</p>
     <div class="tblwrap"><table>
-      <thead><tr><th>Lab</th><th class="num">fold_clothes eps</th><th class="num">Operators</th><th class="num">Scenes</th><th>Usable here?</th></tr></thead>
+      <thead><tr><th>Who filmed it</th><th class="num">Clips</th><th class="num">People</th><th class="num">Rooms</th><th>Can we use it?</th></tr></thead>
       <tbody>
-        <tr class="hero"><td class="mono">rl2</td><td class="num">573</td><td class="num">20</td><td class="num">16</td><td>yes — 190 of 320 cells filled</td></tr>
-        <tr><td class="mono">microagi</td><td class="num">9,896</td><td class="num">0</td><td class="num">0</td><td class="ns">no operator or scene labels</td></tr>
-        <tr><td class="mono">mecka</td><td class="num">1,607</td><td class="num">20</td><td class="num">2</td><td class="ns">only 2 scenes</td></tr>
-        <tr><td class="mono">eth / wang / song</td><td class="num">76 / 40 / 22</td><td class="num">1</td><td class="num">6–10</td><td class="ns">one operator each</td></tr>
+        <tr class="hero"><td class="mono">rl2</td><td class="num">573</td><td class="num">20</td><td class="num">16</td><td>yes</td></tr>
+        <tr><td class="mono">microagi</td><td class="num">9,896</td><td class="num">?</td><td class="num">?</td><td class="ns">nobody recorded who or where</td></tr>
+        <tr><td class="mono">mecka</td><td class="num">1,607</td><td class="num">20</td><td class="num">2</td><td class="ns">only two rooms</td></tr>
+        <tr><td class="mono">eth / wang / song</td><td class="num">76 / 40 / 22</td><td class="num">1</td><td class="num">6–10</td><td class="ns">only one person each</td></tr>
       </tbody>
     </table></div>
-    <p>The biggest slice in the dataset, 9,896 episodes from <span class="mono">microagi</span>,
-      is unusable for us. It has no operator or scene metadata at all.</p>
+    <p class="big">The biggest pile — nearly 10,000 clips — is unusable for this, because nobody
+      wrote down who filmed it or where.</p>
   </section>
 
   <!-- 5 -->
   <section class="slide">
-    <div class="eyebrow">Step 1 of 4</div>
-    <h2>The gate: throw out episodes that are broken</h2>
-    <p>Eight rules, all arithmetic on the pose arrays. No model, no judgement call. Every dropped
-      episode records which rule caught it. Two of the rules scale to the lab's own median
-      episode length, because a "normal" episode is 93 s in one lab and 11 s in another.</p>
-    <div class="tblwrap"><table>
-      <thead><tr><th>Rule</th><th>What it measures</th><th class="num">rl2</th><th class="num">mecka</th><th class="num">microagi</th></tr></thead>
-      <tbody>
-        <tr><td>tracking dropout</td><td>NaN or missing pose in over 5% of frames</td><td class="num">0%</td><td class="num">0%</td><td class="num">0%</td></tr>
-        <tr><td>frozen tracker</td><td>pose repeats bit-for-bit for over 2 seconds</td><td class="num">0%</td><td class="num">0%</td><td class="num">0%</td></tr>
-        <tr><td>too short</td><td>under 3 seconds, can't contain a fold</td><td class="num">0%</td><td class="num">1.2%</td><td class="num">0%</td></tr>
-        <tr><td>no motion</td><td>hands travelled under 10 cm in total</td><td class="num">0%</td><td class="num">0%</td><td class="num">0%</td></tr>
-        <tr class="hero"><td>jittery hand track</td><td>over 1% of frames with a hand moving faster than 10 m/s</td><td class="num">1.0%</td><td class="num">0%</td><td class="num">0%</td></tr>
-        <tr class="hero"><td>head pose jump</td><td>head moves over 20 m/s in one frame — SLAM relocalised</td><td class="num">1.2%</td><td class="num">0%</td><td class="num">0%</td></tr>
-        <tr class="hero"><td>hands far off-axis</td><td>hands held past 45° from where the camera points, for most of the episode</td><td class="num">6.5%</td><td class="num">—</td><td class="num">—</td></tr>
-        <tr class="hero"><td>runaway length</td><td>over 3x the lab's median length — a session, not a demo</td><td class="num">0%</td><td class="num">0%</td><td class="num">13.9%</td></tr>
-        <tr><td>fragment</td><td>under 15% of the lab's median length</td><td class="num">0.2%</td><td class="num">0%</td><td class="num">0%</td></tr>
-      </tbody>
-    </table></div>
-    <p class="big"><strong>rl2 drops 49 of 572 (8.6%) for four different reasons</strong> — hand
-      placement, a jumping hand tracker, a SLAM relocalisation, and one fragment. microagi drops
-      <strong>1 in 7</strong>, and every one of those is length.</p>
-    <p class="cite">The length rules scale to each lab's own median, because a normal episode is
-      93 s in rl2 and 11 s in microagi. The off-axis rule runs on rl2 only, and that is not
-      caution for its own sake: the same arithmetic on microagi returns a median of 160° — behind
-      the camera — so their keypoints are stored in a different frame. Conventions are not shared
-      across labs, and we only verified rl2.</p>
-    <p class="cite">On thresholds: we started with a 99th-percentile length rule and threw it out.
-      A percentile drops exactly 1% of whatever you point it at, clean or filthy, so it tells you
-      nothing. A multiple of the median comes back 0% or 14%, and here it does both.</p>
+    <div class="eyebrow">Step 1 of 3</div>
+    <h2>Throw out the broken ones</h2>
+    <p>Eight checks, all simple arithmetic on the recorded hand and head positions. No AI
+      deciding anything. Every video we drop records which check caught it.</p>
+    <div class="grid g2">
+      <div class="card"><span class="k">Something is broken</span>
+        <p>The hand position data is missing, or frozen, or jumps faster than 10 metres per
+          second — a hand folding laundry moves under 2. That's the tracking glitching, not
+          the person.</p></div>
+      <div class="card"><span class="k">It isn't one demonstration</span>
+        <p>The clip is three seconds long, or the hands barely moved, or it runs three times
+          longer than a normal clip from the same lab — someone left the camera running across
+          a whole laundry session.</p></div>
+    </div>
+    <p class="big">In the collection we test on, this drops <strong>49 of 572</strong> videos.
+      In the biggest collection it drops <strong>1 in 7</strong>.</p>
   </section>
 
   <!-- 6 -->
   <section class="slide">
     <div class="eyebrow">Step 1 · what that looks like</div>
-    <h2>Working in front of the camera, or out at the edge of it</h2>
-    <img class="fig tall" src="__FIG_GATE__" alt="Four rl2 episodes. The two kept ones have hands a median 13 and 15 degrees off the camera axis and the hands sit centrally in frame; the two dropped ones are at 55 and 68 degrees and the hands sit at the extreme bottom edge.">
-    <p>Top two work straight ahead — hands sit in the middle of the frame. Bottom two are at 55°
-      and 68° off the camera axis, and you can see it: the hands are down at the bottom edge,
-      half out of the picture, for the whole episode.</p>
-
+    <h2>A good clip and a bad one</h2>
+    <img class="fig tall" src="__FIG_GATE__" alt="Four videos shown as five frames each. The two kept ones have hands in the middle of the picture. The two dropped ones have hands down at the bottom edge for the whole clip.">
+    <p>The top two are keepers — the person works in front of themselves, hands in the middle of
+      the picture. The bottom two work off to one side, hands half out of shot for the entire
+      clip. Same task, much worse view of it.</p>
   </section>
 
   <!-- 7 -->
   <section class="slide">
-    <div class="eyebrow">Step 1 · what this rule does and doesn't claim</div>
-    <h2>We named this rule twice. The second name is the honest one.</h2>
-    <p>It started as <em>"hands out of frame"</em>. That claim was wrong, and rendering the frames
-      is what showed it: the flagged episodes had hands in plain view.</p>
-    <div class="grid g3">
-      <div class="card bad"><span class="k">Pinhole projection</span>
-        <p>Every keypoint lands outside the image, on frames where hands are obviously visible.</p></div>
-      <div class="card bad"><span class="k">Fisheye projection</span>
-        <p>Same. <strong>0 of 42</strong> keypoints inside the frame.</p></div>
-      <div class="card bad"><span class="k">MediaPipe on the pixels</span>
-        <p>Finds hands in only <strong>59%</strong> of frames overall, and misses them entirely on
-          36 episodes that plainly have them.</p></div>
-    </div>
-    <p class="big">Three ways to ask "is the hand visible", none of them usable on this fisheye
-      footage. So we stopped asking that question.</p>
-    <p>What we kept is the part that survives: the <strong>angle between the hand and the camera's
-      optical axis</strong>. That needs no lens model — it's just geometry on the stored keypoints —
-      and it splits the slice cleanly, most episodes near 19° and a tail near 57°. The rule now says
-      the hands were held far off to the side, which you can check against the frames. It does not
-      say they were invisible, which we can't support.</p>
-
+    <div class="eyebrow">Step 1 · a mistake we made</div>
+    <h2>We got a check wrong, and pictures are what told us</h2>
+    <p>One check was meant to catch clips where the hands leave the picture entirely. It flagged
+      23 videos. Then we printed those frames out to put in this deck — and the hands were right
+      there in every one.</p>
+    <p class="big">We tried three different ways to work out whether a hand is in shot. All three
+      disagreed with what the pictures plainly showed. This camera is a fisheye lens looking down
+      at an odd angle, and none of the standard methods cope with it.</p>
+    <p>So we stopped claiming the hands were invisible, and now claim only what we can prove:
+      the hands were held <strong>far off to the side</strong>. That is measurable, and you can
+      check it against the frames on the previous slide.</p>
+    <p class="cite">Worth saying: the numbers looked completely reasonable. Nothing about them
+      flagged itself as wrong. We only caught it because we looked at the pictures.</p>
   </section>
 
   <!-- 8 -->
   <section class="slide">
-    <div class="eyebrow">Step 2 of 4</div>
-    <h2>Describe each episode as 41 numbers</h2>
-    <p>To pick a spread-out subset you need a notion of which episodes resemble each other.
-      We build one from the hand and head trajectories. No video, no neural network.</p>
+    <div class="eyebrow">Step 2 of 3</div>
+    <h2>Describe each video as 41 numbers</h2>
+    <p>To pick a varied set, you first need a way of saying whether two videos are similar. We
+      build one from how the person moved — no video, no AI.</p>
     <div class="grid g4">
-      <div class="card"><span class="k">Motion</span><p>path length, mean and peak speed, acceleration spread, how much of the episode the hand was actually moving</p></div>
-      <div class="card"><span class="k">Workspace</span><p>the bounding box each hand swept, its volume, where its centre sat</p></div>
-      <div class="card"><span class="k">Two hands</span><p>correlation between the two hands' speeds, distance between them, closest approach</p></div>
-      <div class="card"><span class="k">Grip &amp; view</span><p>finger spread around the wrist over time, how much the head moved and turned</p></div>
+      <div class="card"><span class="k">Speed</span><p>how far the hands travelled, how fast, how jerkily, how much of the clip they were moving at all</p></div>
+      <div class="card"><span class="k">Space</span><p>how big an area each hand swept out, and where that area sat</p></div>
+      <div class="card"><span class="k">Both hands</span><p>whether the hands moved together or took turns, and how close they came</p></div>
+      <div class="card"><span class="k">Grip &amp; head</span><p>how wide the fingers spread, and how much the person turned their head</p></div>
     </div>
-    <p>Then whiten every column so no single feature dominates the distances. Two episodes are
-      "similar" if these 41 numbers are close.</p>
+    <p class="big">Two videos are "similar" when these 41 numbers are close. That's all "similar"
+      means here.</p>
   </section>
 
   <!-- 9 -->
   <section class="slide">
-    <div class="eyebrow">Step 3 of 4 · what the selectors do</div>
+    <div class="eyebrow">Step 3 of 3 · the idea</div>
     <h2>Four ways to spend the same budget</h2>
-    <img class="fig" src="__FIG_SELECTORS__" alt="Four scatter plots of the same 346-point toy cloud, each with 26 points selected by a different method.">
-    <p class="big">Same 346 points, same 26 picks. Random spends 18 of them inside the big blob.
-      Log-det spends 12 and reaches all four pockets.</p>
-    <p><strong>Facility location</strong> asks: is every episode close to something I picked?
-      <strong>k-center</strong> asks: what's the furthest thing from everything I've picked so far?
-      <strong>Log-det (DPP)</strong> asks: which set spans the most volume, so no two picks are redundant?</p>
+    <img class="fig" src="__FIG_SELECTORS__" alt="Four scatter plots of the same cloud of dots. Each picks 26 dots a different way. Random puts 18 of them inside the big central blob; the diversity method puts 12 there and reaches all four outlying clumps.">
+    <p class="big">Same dots, same number of picks. Picking at random spends 18 of 26 inside the
+      big crowded blob. The method we ended up using spends 12 there and reaches all four
+      outlying groups.</p>
+    <p>The three methods differ in what they ask. <strong>"Is everything near something I
+      picked?"</strong> · <strong>"What's furthest from everything I've picked so far?"</strong>
+      · <strong>"Which set is most spread out overall?"</strong> The last one won.</p>
   </section>
 
   <!-- 10 -->
   <section class="slide">
-    <div class="eyebrow">Step 3 · on the real data</div>
-    <h2>The same thing, 572 real episodes</h2>
-    <img class="fig" src="__FIG_MANIFOLD__" alt="Two panels of the real episode embedding: k-center spreads its 135 picks evenly and covers 104 operator-scene groups; the degenerate control clumps and covers 21.">
-    <p>Both panels pick 135 of 565 episodes. The left one lands in 104 different
-      operator×scene combinations. The right one lands in 21. That gap is what the whole
-      experiment is trying to price.</p>
+    <div class="eyebrow">Step 3 · on the real videos</div>
+    <h2>The same idea, 572 real clips</h2>
+    <img class="fig" src="__FIG_MANIFOLD__" alt="Two panels of the same cloud of real videos. The varied pick spreads across the whole cloud and covers 97 person-and-room combinations; the narrow pick clumps and covers 20.">
+    <p class="big">Both sides keep exactly the same number of videos. The left one ends up with
+      97 different combinations of person-and-room. The right one gets 20.</p>
+    <p>That gap is the whole experiment: does spreading your pick out actually buy you anything?</p>
   </section>
 
   <!-- 11 -->
   <section class="slide">
-    <div class="eyebrow">Step 4 of 4 · the measurement</div>
-    <h2>What Avg-MSE actually is</h2>
-    <img class="fig tall" src="__FIG_MSE__" alt="A held-out episode showing ten frames of hand-pose history, the human's actual next thirty frames, the model's prediction, and the gap between them shaded in red.">
-    <p>Train a small model on the subset. Show it 10 frames of where the hands have been, ask
-      it where they go for the next 30 frames. Subtract its answer from what the human did,
-      square it, average over every number, every window, every held-out episode. Lower is better.</p>
+    <div class="eyebrow">How we score it</div>
+    <h2>What "better" means here</h2>
+    <img class="fig tall" src="__FIG_MSE__" alt="A held-out clip. The green line is the ten frames of hand movement the model was shown. The black line is what the person actually did next. The blue dashed line is the model's guess. The red shading is the gap between them.">
+    <p class="big">Show the model a third of a second of where someone's hands have been. Ask it
+      where they go next. Compare its guess to what the person actually did. The red shading is
+      how wrong it was. Less red is better.</p>
+    <p>We do that on clips the model has never seen, for every set of videos we're comparing.</p>
   </section>
 
   <!-- 12 -->
   <section class="slide">
-    <div class="eyebrow">Step 4 · why this metric</div>
-    <h2>It's the authors' metric, not ours</h2>
-    <div class="quote">“we report primarily the offline Avg-MSE metric… While this metric does
-      not directly measure downstream robot performance, it provides a stable signal for
-      comparing generalization.”</div>
-    <p class="cite">— EgoVerse, arXiv 2604.07607</p>
-    <p>We chose it because when someone objects that Avg-MSE isn't robot success, we don't have
-      to defend our own taste. The people who built the dataset already made this trade and
-      wrote down why.</p>
-    <p>Two details that keep it honest. We predict hand motion <strong>relative to where the hand
-      is now</strong>, so the model can't score points by memorising which room it's in. And the
-      model is closed-form ridge regression, so there's no training noise. Same subset in, same
-      numbers out, every time.</p>
+    <div class="eyebrow">How we score it · being fair</div>
+    <h2>Two things that keep this honest</h2>
+    <div class="grid g2">
+      <div class="card"><span class="k">We didn't invent the score</span>
+        <p>It's the same one the people who built EgoVerse use in their own paper, and they say
+          plainly that it's a stand-in rather than a measure of whether a robot succeeds. We use
+          it on exactly those terms.</p></div>
+      <div class="card"><span class="k">Nothing else changes</span>
+        <p>Same model, same settings, same test clips every time. Only the training videos
+          differ, so any difference in score has to come from the videos. And the model has no
+          randomness in it, so re-running gives the same answer.</p></div>
+    </div>
+    <p class="big">We also ask the model to predict movement <em>relative to where the hand is
+      now</em> — otherwise it could score well just by memorising which room it's in.</p>
   </section>
 
   <!-- 13 -->
   <section class="slide">
-    <div class="eyebrow">Experiment design</div>
-    <h2>Every comparison is head-to-head</h2>
-    <p>Each seed picks a different set of held-out operators and scenes. That shifts the score
-      for every method at once, sometimes by more than the effect we're looking for. Averaging
-      across seeds and quoting a standard deviation would bury the result in that noise.</p>
-    <p class="big">So we never compare averages. Each method is compared to random on the
-      <strong>same seed</strong>, the <strong>same budget</strong>, and the
-      <strong>same held-out episodes</strong>, and we count how often it wins.</p>
+    <div class="eyebrow">How we score it · the comparison</div>
+    <h2>40 head-to-head races</h2>
+    <p>Each time we run this, we pick a different set of people and rooms to hold back for
+      testing. That shifts every score at once, sometimes by more than the effect we're looking
+      for — so averaging the scores together would bury the answer in noise.</p>
+    <p class="big">Instead we never compare averages. Every method races random <strong>on the
+      same test, with the same budget, on the same held-back clips</strong>, and we count who
+      wins.</p>
     <div class="grid g3">
-      <div class="card"><span class="k">Seeds</span><span class="v">10</span><p>each redraws the held-out split</p></div>
-      <div class="card"><span class="k">Budgets</span><span class="v">2</span><p>25% and 50% of the pool</p></div>
-      <div class="card"><span class="k">Held-out axes</span><span class="v">2</span><p>unseen operators, unseen scenes</p></div>
+      <div class="card"><span class="k">Repeats</span><span class="v">10</span><p>each with a different set held back</p></div>
+      <div class="card"><span class="k">Budgets</span><span class="v">2</span><p>a quarter of the videos, and a half</p></div>
+      <div class="card"><span class="k">Tests</span><span class="v">2</span><p>new people, and new rooms</p></div>
     </div>
-    <p class="cite">10 × 2 × 2 = 40 head-to-head tests per method. Significance from a two-sided
-      Wilcoxon signed-rank test on the paired differences.</p>
+    <p class="cite">10 × 2 × 2 = 40 races per method.</p>
   </section>
 
   <!-- 14 -->
   <section class="slide">
-    <div class="eyebrow">Result</div>
-    <h2>Spreading the picks out helps, every time</h2>
+    <div class="eyebrow">The result</div>
+    <h2>Spreading the pick out wins, every time</h2>
     <div class="tblwrap"><table>
-      <thead><tr><th>Method</th><th class="num">Wins</th><th class="num">Mean Avg-MSE</th><th class="num">p</th></tr></thead>
+      <thead><tr><th>How we picked</th><th class="num">Races won</th><th class="num">Prediction error</th></tr></thead>
       <tbody>
-        <tr class="hero"><td>log-det (DPP)</td><td class="num">40/40</td><td class="num neg">−3.53%</td><td class="num">2e−12</td></tr>
-        <tr><td>curated (facility location)</td><td class="num">33/40</td><td class="num neg">−2.14%</td><td class="num">1e−09</td></tr>
-        <tr><td>k-center</td><td class="num">40/40</td><td class="num neg">−3.45%</td><td class="num">2e−12</td></tr>
-        <tr><td>skip the quality gate</td><td class="num">24/40</td><td class="num ns">+0.02%</td><td class="num ns">0.52</td></tr>
-        <tr class="ctrl"><td>degenerate (the control)</td><td class="num">1/40</td><td class="num pos">+5.83%</td><td class="num">4e−12</td></tr>
+        <tr class="hero"><td>most spread out</td><td class="num">40/40</td><td class="num neg">3.5% better</td></tr>
+        <tr><td>furthest-from-what-I-have</td><td class="num">40/40</td><td class="num neg">3.4% better</td></tr>
+        <tr><td>everything-has-a-neighbour</td><td class="num">33/40</td><td class="num neg">2.1% better</td></tr>
+        <tr><td>skipping the broken-clip check</td><td class="num">24/40</td><td class="num ns">no difference</td></tr>
+        <tr class="ctrl"><td>deliberately narrow</td><td class="num">1/40</td><td class="num pos">5.8% worse</td></tr>
       </tbody>
     </table></div>
-    <p><strong>Both halves pay, but you have to look in the right place.</strong> Skipping the
-      gate costs nothing measurable on rl2, and it shouldn't: the gate only drops 1 episode in 572
-      there. We measured the gate separately on microagi, where it drops 1 in 7. Next slide.</p>
-    <p class="cite">This also reverses what we said after 3 seeds, when the gate looked worth about
-      a percent. Ten seeds killed it.</p>
-  </section>
-
-  <!-- 14b -->
-  <section class="slide">
-    <div class="eyebrow">Pricing the gate</div>
-    <h2>The long episodes are worse frame for frame</h2>
-    <p>microagi has no operator or scene labels, so the selection experiment can't run there.
-      But pricing the <em>gate</em> needs less: just a held-out set, not a held-out axis. Hold
-      out a random quarter, train on the rest with and without the runaway episodes, compare.</p>
-    <div class="tblwrap"><table>
-      <thead><tr><th>Budget matched on</th><th class="num">Training windows</th><th class="num">Gate wins</th><th class="num">Avg-MSE</th><th class="num">p</th></tr></thead>
-      <tbody>
-        <tr><td>episodes</td><td class="num">16,193 vs 31,237</td><td class="num">1/10</td><td class="num pos">+1.68%</td><td class="num">0.004</td></tr>
-        <tr class="hero"><td>frames</td><td class="num">16,193 vs 16,233</td><td class="num">10/10</td><td class="num neg">−4.66%</td><td class="num">0.002</td></tr>
-      </tbody>
-    </table></div>
-    <p class="big">Match on episode count and the gate looks harmful. That's an artefact: a runaway
-      episode carries sixty times the frames of a normal one, so the ungated arm was quietly
-      training on twice the data.</p>
-    <p><strong>Match on frames and the gate wins every single seed.</strong> The runaway episodes
-      were never better data — they were just more of it. Drop them and you get a 4.7% better model
-      from the same number of training frames.</p>
-    <p class="cite">Held-out episodes come from the same pool, so this is in-distribution: it says
-      the runaway episodes are worse to train on. It does not say anything about transfer to a new
-      operator — that's what rl2 is for. And it is a second reason to budget curation in seconds
-      rather than episodes.</p>
+    <p class="big">Skipping the broken-clip check costs nothing measurable <em>here</em> — and it
+      shouldn't, because this collection is clean enough that the check only removes 49 clips.
+      We measured it properly somewhere dirtier. Two slides on.</p>
   </section>
 
   <!-- 15 -->
   <section class="slide">
     <div class="eyebrow">The part to be suspicious of</div>
-    <h2>Why believe a 4% difference?</h2>
-    <p>It's a small number, on a proxy metric, over a few hundred episodes. The obvious worry is
-      that our measurement is too noisy to see anything and we got lucky.</p>
-    <p class="big">So we added a method designed to lose. Same budget, but spent inside as few
-      operator×scene groups as possible: about 21 instead of about 73.</p>
+    <h2>Why believe a 3.5% difference?</h2>
+    <p>It's a small number. The obvious worry is that our test is too noisy to tell anything
+      apart, and we got lucky 40 times.</p>
+    <p class="big">So we added a method <strong>designed to lose</strong>: same number of videos,
+      but taken almost entirely from a handful of people in a handful of rooms.</p>
     <div class="grid g2">
-      <div class="card bad"><span class="k">Degenerate</span><span class="v bad">1 / 40</span>
-        <p>+5.83% Avg-MSE, p = 4e−12</p></div>
+      <div class="card bad"><span class="k">The deliberately narrow pick</span><span class="v bad">1 / 40</span>
+        <p>races won, and 5.8% worse on average</p></div>
       <div class="card"><span class="k">Why that settles it</span>
-        <p>The EgoVerse paper already showed that operator and scene variety improve
-          generalization. Our setup reproduces that. So it can detect a real effect of this
-          kind, and the smaller numbers above aren't noise.</p></div>
+        <p>The EgoVerse team already showed that variety in people and rooms helps. Our test
+          finds the same thing. So it <em>can</em> tell a good pick from a bad one — which means
+          the smaller numbers above are real, not noise.</p></div>
     </div>
-    <p>The control also gets weaker at the 50% budget, which is what should happen — with half
-      the pool you can't concentrate the picks very much. A control that stayed flat would have
-      meant we'd built it wrong.</p>
   </section>
 
   <!-- 16 -->
   <section class="slide">
     <div class="eyebrow">Where it stops</div>
-    <h2>More data still beats better data</h2>
-    <p class="big">Training on all 565 gated episodes beats every 25% and 50% subset we built,
-      including the winning one.</p>
-    <div class="tblwrap"><table>
-      <thead><tr><th>Training set</th><th class="num">Unseen operator</th><th class="num">Unseen scene</th></tr></thead>
-      <tbody>
-        <tr><td>random 25%</td><td class="num">0.11381</td><td class="num">0.10115</td></tr>
-        <tr><td>log-det 25%</td><td class="num">0.10749</td><td class="num">0.09637</td></tr>
-        <tr class="hero"><td>everything (100%)</td><td class="num">0.10166</td><td class="num">0.09149</td></tr>
-      </tbody>
-    </table></div>
-    <p class="big">So the claim isn't "delete 75% of your data for free." It's this: at a quarter
-      of the budget, choosing well recovers <strong>52%</strong> of the distance between a random
-      quarter and using everything.</p>
-    <p>That's the number worth having if you're deciding what to label next, what to ship to a
-      robot, or what to pay someone to collect.</p>
+    <h2>Using everything is still best</h2>
+    <p class="big">Training on all the videos beats every quarter and half we picked, including
+      our best one. Picking well does not beat having more.</p>
+    <div class="grid g2">
+      <div class="card bad"><span class="k">What we're not saying</span>
+        <p style="font-size:clamp(14px,1.7vw,20px)">"Delete 75% of your data for free."</p></div>
+      <div class="card accent"><span class="k">What we actually measured</span>
+        <p style="font-size:clamp(14px,1.7vw,20px);color:var(--ink)">At a quarter of the data, a
+          varied pick closes about <strong>45%</strong> of the gap between a random quarter and
+          using everything.</p></div>
+    </div>
+    <p>That second number is the useful one if you're deciding what to collect next, what to pay
+      someone to label, or what to fit on a robot.</p>
   </section>
 
   <!-- 17 -->
   <section class="slide">
-    <div class="eyebrow">Robustness</div>
-    <h2>Did we tune the model until it agreed with us?</h2>
-    <p>Fair question, so we reran the whole comparison across nine settings of the scoring
-      model: regularisation 0.1 / 1 / 10, feature width 256 / 512 / 1024, history 5 / 10 / 20
-      frames, horizon 15 / 30 / 60 steps. Nothing retuned per method.</p>
-    <div class="grid g2">
-      <div class="card"><span class="k">Log-det beats random in</span><span class="v good">9 / 9</span>
-        <p>settings · mean −4.20% · worst case still −3.14%</p></div>
-      <div class="card bad"><span class="k">The control beats random in</span><span class="v bad">0 / 9</span>
-        <p>settings · mean +14.89%</p></div>
-    </div>
-    <p>The ordering never changed. If it only held at one setting we wouldn't be showing it.</p>
+    <div class="eyebrow">The broken-clip check, measured</div>
+    <h2>Long clips aren't better data — just more of it</h2>
+    <p>In the biggest collection, 1 in 7 clips runs more than three times the normal length.
+      Someone left the camera going across a whole laundry session and saved it as one clip.
+      Are those worth keeping?</p>
+    <div class="tblwrap"><table>
+      <thead><tr><th>If both sides get the same…</th><th class="num">Dropping them</th><th class="num">Result</th></tr></thead>
+      <tbody>
+        <tr><td>number of clips</td><td class="num">wins 1 of 10</td><td class="num pos">1.7% worse</td></tr>
+        <tr class="hero"><td>amount of footage</td><td class="num">wins 10 of 10</td><td class="num neg">4.7% better</td></tr>
+      </tbody>
+    </table></div>
+    <p class="big">Count clips and dropping them looks like a mistake. But one long clip holds
+      sixty times the footage of a normal one — so the side that kept them was quietly training
+      on twice as much material.</p>
+    <p><strong>Give both sides the same amount of footage and dropping them wins every time.</strong>
+      The long clips were never better data. There was just more of it.</p>
   </section>
 
   <!-- 18 -->
   <section class="slide">
-    <div class="eyebrow">Things we learned about the dataset</div>
-    <h2>Three findings that cost us time</h2>
-    <div class="grid g3">
-      <div class="card"><span class="k">Padding</span>
-        <p>Zarr arrays are zero-padded out to a chunk boundary. Read one straight and the tail
-          looks exactly like a frozen tracker. Our gate would have deleted the entire dataset.
-          The real length is <span class="mono">total_frames</span> in the group attributes.</p></div>
-      <div class="card"><span class="k">Cost</span>
-        <p>Video for this slice is 84.6 GB. The pose arrays are 2.3 GB. We built everything on
-          poses on purpose: a curation step that costs more than the training run it saves
-          isn't worth running.</p></div>
-      <div class="card"><span class="k">Units</span>
-        <p>An "episode" means different things in different labs. Median 93 s in
-          <span class="mono">rl2</span>, 6.6 s in <span class="mono">mecka</span>. If you budget
-          in episode counts across labs you're comparing 14:1. Budget in seconds.</p></div>
+    <div class="eyebrow">Did we fiddle with it?</div>
+    <h2>The answer doesn't depend on our settings</h2>
+    <p>Fair thing to ask. So we re-ran the whole comparison nine times with different settings
+      for the scoring model — bigger, smaller, more memory, less memory, looking further ahead
+      and less far ahead. We didn't re-tune anything to suit any particular method.</p>
+    <div class="grid g2">
+      <div class="card"><span class="k">Our pick beat random in</span><span class="v good">9 / 9</span>
+        <p>settings, by 4.2% on average and never less than 3.1%</p></div>
+      <div class="card bad"><span class="k">The bad pick beat random in</span><span class="v bad">0 / 9</span>
+        <p>settings</p></div>
     </div>
-    <p class="cite">Both labs came back clean on tracking dropout and frozen trackers, 0.0% each.
-      That's worth knowing, not a null result.</p>
+    <p class="big">The ordering never changed once. If it only held for one particular setup we
+      wouldn't be showing it to you.</p>
   </section>
 
   <!-- 19 -->
   <section class="slide">
-    <div class="eyebrow">Limitations</div>
-    <h2>What we'd attack if this were someone else's</h2>
-    <ul>
-      <li><strong>Avg-MSE isn't robot success.</strong> It ranks subsets. It doesn't tell you a
-        robot trained on the winner will pick up more shirts.</li>
-      <li><strong>The scoring model never sees the video.</strong> That falls out of the 84.6 GB
-        number. A vision-based policy could rank these subsets differently and we couldn't tell.</li>
-      <li><strong>One task, one lab.</strong> We can't claim this transfers. We didn't choose
-        <span class="mono">rl2</span> because it suited us, we chose it because it was the only
-        slice with the metadata.</li>
-      <li><strong>The off-axis rule is a proxy for something we couldn't measure directly.</strong>
-        It says the hands were held far to the side, which is true and checkable. It does not say
-        they were unusable, and our proprioceptive metric can't tell us whether they were.</li>
-      <li><strong>Facility location was our pick going in, and it lost</strong> to log-det and
-        k-center. We left it in the table rather than quietly reordering the story.</li>
-    </ul>
+    <div class="eyebrow">Things we learned along the way</div>
+    <h2>Three things about this library worth knowing</h2>
+    <div class="grid g3">
+      <div class="card"><span class="k">A trap in the files</span>
+        <p>The data files pad every clip out with blank frames at the end. Read them without
+          trimming and every clip looks like the tracking froze. Our check would have thrown
+          away the entire library.</p></div>
+      <div class="card"><span class="k">Video is expensive</span>
+        <p>The video for these clips is 84.6 GB. The recorded hand positions are 2.3 GB. We
+          built everything on the positions on purpose — a filter that costs more to run than
+          the training it saves isn't worth having.</p></div>
+      <div class="card"><span class="k">A "clip" isn't one thing</span>
+        <p>A clip is 90 seconds in one lab and 11 in another. If you ask for "1,000 clips" from
+          two labs you get wildly different amounts of footage. Ask for hours, not clips.</p></div>
+    </div>
+    <p class="cite">Both labs came back completely clean on missing and frozen tracking — 0% each.
+      That's worth knowing too.</p>
   </section>
 
   <!-- 20 -->
   <section class="slide">
-    <div class="eyebrow">Try it</div>
+    <div class="eyebrow">Limitations</div>
+    <h2>What we'd attack if this were someone else's</h2>
+    <ul>
+      <li><strong>Our score isn't robot success.</strong> It measures how well a model predicts
+        human hand movement. It does not tell you a robot trained on the winner folds more shirts.</li>
+      <li><strong>The scoring model never sees the video.</strong> That falls out of the 84.6 GB
+        problem. A model that looked at pictures might rank these sets differently, and we
+        couldn't tell.</li>
+      <li><strong>One task, one lab.</strong> We can't promise this carries over. And we didn't
+        choose that lab because it suited us — it was the only one with the right labels.</li>
+      <li><strong>Our first-choice method lost.</strong> We went in expecting one approach to
+        win and a different one did. We left the loser in the table rather than quietly
+        reordering the story.</li>
+    </ul>
+  </section>
+
+  <!-- 21 -->
+  <section class="slide">
+    <div class="eyebrow">Have a go</div>
     <h2>The Curation Manifold</h2>
-    <p class="big">Switch between the methods and watch which 135 episodes each one keeps. Hover
-      any dot to see the actual frame, and for dropped episodes, the reason.</p>
-    <img class="fig" src="__FIG_PAIRED__" alt="Paired differences against random for every method, on both held-out axes.">
+    <p class="big">Switch between the ways of picking and watch which videos each one keeps.
+      Hover any dot to see a real frame from that video — and if we dropped it, why.</p>
+    <img class="fig" src="__FIG_PAIRED__" alt="Every race plotted as a dot. Methods to the left of the centre line beat random; the deliberately narrow one sits well to the right.">
     <div class="grid g2">
-      <div class="card"><span class="k">Repo</span><p class="mono">github.com/sahilmahendrakar/egoscore</p>
-        <p><span class="mono">bash scripts/run_all.sh</span> rebuilds every number in this deck.</p></div>
+      <div class="card"><span class="k">Code</span><p class="mono">github.com/sahilmahendrakar/egoscore</p>
+        <p>One command rebuilds every number in this deck from scratch.</p></div>
       <div class="card accent"><span class="k">Live demo</span>
-        <p>The manifold, the five methods, the drop reasons, and 572 real thumbnails.</p></div>
+        <p>1,772 videos, the four ways of picking, and a real frame behind every dot.</p></div>
     </div>
   </section>
 
@@ -549,7 +516,6 @@
   const bar = document.getElementById("bar");
   const count = document.getElementById("count");
   let i = 0;
-
   function show(n) {
     i = Math.max(0, Math.min(slides.length - 1, n));
     slides.forEach((s, k) => s.classList.toggle("on", k === i));
@@ -558,7 +524,6 @@
     history.replaceState(null, "", "#" + (i + 1));
     slides[i].scrollTop = 0;
   }
-
   document.addEventListener("keydown", (e) => {
     if (e.key === "ArrowRight" || e.key === "PageDown" || e.key === " ") { e.preventDefault(); show(i + 1); }
     else if (e.key === "ArrowLeft" || e.key === "PageUp") { e.preventDefault(); show(i - 1); }
@@ -571,7 +536,6 @@
   });
   document.getElementById("next").addEventListener("click", () => show(i + 1));
   document.getElementById("prev").addEventListener("click", () => show(i - 1));
-
   const start = parseInt(location.hash.replace("#", ""), 10);
   show(Number.isFinite(start) && start > 0 ? start - 1 : 0);
 })();
