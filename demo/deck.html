@@ -160,9 +160,9 @@
     <div class="grid g3">
       <div class="card"><span class="k">Slice</span><span class="v">572</span>
         <p><span class="mono">fold_clothes</span> episodes from lab <span class="mono">rl2</span></p></div>
-      <div class="card"><span class="k">Best selector</span><span class="v good">−3.96%</span>
+      <div class="card"><span class="k">Best selector</span><span class="v good">−3.53%</span>
         <p>Avg-MSE against random, winning 40 of 40 paired tests</p></div>
-      <div class="card accent"><span class="k">Control that should lose</span><span class="v bad">+6.60%</span>
+      <div class="card accent"><span class="k">Control that should lose</span><span class="v bad">+5.83%</span>
         <p>lost 39 of 40, which is how we know the test works</p></div>
     </div>
     <p class="cite">github.com/sahilmahendrakar/egoscore</p>
@@ -221,7 +221,7 @@
   <section class="slide">
     <div class="eyebrow">Step 1 of 4</div>
     <h2>The gate: throw out episodes that are broken</h2>
-    <p>Six rules, all arithmetic on the pose arrays. No model, no judgement call. Every dropped
+    <p>Eight rules, all arithmetic on the pose arrays. No model, no judgement call. Every dropped
       episode records which rule caught it. Two of the rules scale to the lab's own median
       episode length, because a "normal" episode is 93 s in one lab and 11 s in another.</p>
     <div class="tblwrap"><table>
@@ -231,17 +231,21 @@
         <tr><td>frozen tracker</td><td>pose repeats bit-for-bit for over 2 seconds</td><td class="num">0%</td><td class="num">0%</td><td class="num">0%</td></tr>
         <tr><td>too short</td><td>under 3 seconds, can't contain a fold</td><td class="num">0%</td><td class="num">1.2%</td><td class="num">0%</td></tr>
         <tr><td>no motion</td><td>hands travelled under 10 cm in total</td><td class="num">0%</td><td class="num">0%</td><td class="num">0%</td></tr>
+        <tr class="hero"><td>jittery hand track</td><td>over 1% of frames with a hand moving faster than 10 m/s</td><td class="num">1.0%</td><td class="num">0%</td><td class="num">0%</td></tr>
+        <tr class="hero"><td>head pose jump</td><td>head moves over 20 m/s in one frame — SLAM relocalised</td><td class="num">1.2%</td><td class="num">0%</td><td class="num">0%</td></tr>
         <tr class="hero"><td>hands far off-axis</td><td>hands held past 45° from where the camera points, for most of the episode</td><td class="num">6.5%</td><td class="num">—</td><td class="num">—</td></tr>
         <tr class="hero"><td>runaway length</td><td>over 3x the lab's median length — a session, not a demo</td><td class="num">0%</td><td class="num">0%</td><td class="num">13.9%</td></tr>
         <tr><td>fragment</td><td>under 15% of the lab's median length</td><td class="num">0.2%</td><td class="num">0%</td><td class="num">0%</td></tr>
       </tbody>
     </table></div>
-    <p class="big"><strong>rl2 drops 38 of 572 (6.6%), almost all for hand placement.</strong> The
-      biggest slice of fold_clothes data, microagi, drops <strong>1 in 7</strong> — but for a
-      completely different reason: length.</p>
-    <p class="cite">The last two rules scale to each lab's own median, because a normal episode is
-      93 s in rl2 and 11 s in microagi. The off-axis rule is computed for rl2 only: it needs the
-      camera focal length, which we verified constant there and have not checked elsewhere.</p>
+    <p class="big"><strong>rl2 drops 49 of 572 (8.6%) for four different reasons</strong> — hand
+      placement, a jumping hand tracker, a SLAM relocalisation, and one fragment. microagi drops
+      <strong>1 in 7</strong>, and every one of those is length.</p>
+    <p class="cite">The length rules scale to each lab's own median, because a normal episode is
+      93 s in rl2 and 11 s in microagi. The off-axis rule runs on rl2 only, and that is not
+      caution for its own sake: the same arithmetic on microagi returns a median of 160° — behind
+      the camera — so their keypoints are stored in a different frame. Conventions are not shared
+      across labs, and we only verified rl2.</p>
     <p class="cite">On thresholds: we started with a 99th-percentile length rule and threw it out.
       A percentile drops exactly 1% of whatever you point it at, clean or filthy, so it tells you
       nothing. A multiple of the median comes back 0% or 14%, and here it does both.</p>
@@ -374,11 +378,11 @@
     <div class="tblwrap"><table>
       <thead><tr><th>Method</th><th class="num">Wins</th><th class="num">Mean Avg-MSE</th><th class="num">p</th></tr></thead>
       <tbody>
-        <tr class="hero"><td>log-det (DPP)</td><td class="num">40/40</td><td class="num neg">−3.96%</td><td class="num">2e−12</td></tr>
-        <tr><td>curated (facility location)</td><td class="num">35/40</td><td class="num neg">−2.24%</td><td class="num">1e−09</td></tr>
-        <tr><td>k-center</td><td class="num">39/40</td><td class="num neg">−3.56%</td><td class="num">4e−12</td></tr>
-        <tr><td>skip the quality gate</td><td class="num">24/40</td><td class="num ns">−0.76%</td><td class="num ns">0.09</td></tr>
-        <tr class="ctrl"><td>degenerate (the control)</td><td class="num">1/40</td><td class="num pos">+6.60%</td><td class="num">4e−12</td></tr>
+        <tr class="hero"><td>log-det (DPP)</td><td class="num">40/40</td><td class="num neg">−3.53%</td><td class="num">2e−12</td></tr>
+        <tr><td>curated (facility location)</td><td class="num">33/40</td><td class="num neg">−2.14%</td><td class="num">1e−09</td></tr>
+        <tr><td>k-center</td><td class="num">40/40</td><td class="num neg">−3.45%</td><td class="num">2e−12</td></tr>
+        <tr><td>skip the quality gate</td><td class="num">24/40</td><td class="num ns">+0.02%</td><td class="num ns">0.52</td></tr>
+        <tr class="ctrl"><td>degenerate (the control)</td><td class="num">1/40</td><td class="num pos">+5.83%</td><td class="num">4e−12</td></tr>
       </tbody>
     </table></div>
     <p><strong>Both halves pay, but you have to look in the right place.</strong> Skipping the
@@ -424,7 +428,7 @@
       operator×scene groups as possible: about 21 instead of about 73.</p>
     <div class="grid g2">
       <div class="card bad"><span class="k">Degenerate</span><span class="v bad">1 / 40</span>
-        <p>+6.60% Avg-MSE, p = 4e−12</p></div>
+        <p>+5.83% Avg-MSE, p = 4e−12</p></div>
       <div class="card"><span class="k">Why that settles it</span>
         <p>The EgoVerse paper already showed that operator and scene variety improve
           generalization. Our setup reproduces that. So it can detect a real effect of this

@@ -155,6 +155,26 @@ def quality_signals(ep: dict[str, np.ndarray]) -> dict:
         out[f"path_len_{name}"] = float(np.linalg.norm(np.diff(xyz, axis=0), axis=-1).sum())
         out[f"speed_mean_{name}"] = float(s.mean())
         out[f"net_disp_{name}"] = float(np.linalg.norm(xyz[-1] - xyz[0]))
+    # --- physically impossible motion -------------------------------------
+    # Folding laundry, a hand moves well under 2 m/s. Anything past 10 m/s (36 km/h) in a
+    # single frame is the tracker jumping, not the person. One stray frame is noise; a
+    # sustained rate of them means the track cannot be trusted as a training target.
+    if speeds:
+        allsp = np.concatenate(speeds)
+        out["hand_speed_max"] = float(allsp.max())
+        out["hand_jitter_frac"] = float((allsp > 10.0).mean())
+    else:
+        out["hand_speed_max"] = 0.0
+        out["hand_jitter_frac"] = 1.0
+
+    # Head pose comes from visual-inertial SLAM. A 20 m/s jump is the solver relocalising,
+    # which corrupts every hand pose expressed relative to the head.
+    if head is not None and len(head) > 1:
+        hs = np.linalg.norm(np.diff(np.nan_to_num(head[:, :3]), axis=0), axis=-1) * FPS
+        out["head_speed_max"] = float(hs.max())
+    else:
+        out["head_speed_max"] = 0.0
+
     out["motion_energy"] = float(np.concatenate(speeds).mean()) if speeds else 0.0
     out["path_len_total"] = out.get("path_len_left", 0.0) + out.get("path_len_right", 0.0)
 

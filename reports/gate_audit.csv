@@ -3,7 +3,9 @@ tracking_dropout,nan_max,gt 0.05,0,0.0,non-finite pose/keypoint values in >5% of
 frozen_tracker,frozen_run_max_s,gt 2.0,0,0.0,pose held bit-identical for >2s (tracker dropout)
 too_short,duration_s,lt 3.0,0,0.0,shorter than 3s — cannot contain a fold
 no_motion,path_len_total,lt 0.1,0,0.0,hands travelled <10cm in total
-hands_far_off_axis,offaxis_max,gt 0.5,37,6.468531468531468,a hand is held >45 deg off the camera axis for most of the episode
+jittery_hand_track,hand_jitter_frac,gt 0.01,6,1.048951048951049,"over 1% of frames have a hand moving >10 m/s — the tracker is jumping, not the person"
+head_pose_jump,head_speed_max,gt 20.0,7,1.2237762237762237,head jumps >20 m/s in one frame — SLAM relocalised mid-episode
+hands_far_off_axis,offaxis_max,gt 0.5 (labs: rl2),37,6.468531468531468,a hand is held >45 deg off the camera axis for most of the episode
 runaway_length,duration_s,gt 3.0x median (278s),0,0.0,"more than 3x the median episode length — an un-segmented recording, not one demo"
 suspiciously_short,duration_s,lt 0.15x median (14s),1,0.17482517482517482,"under 15% of the median episode length — a fragment, not a demo"
-ANY (dropped),-,-,38,6.643356643356643,union of all rules over 572 episodes
+ANY (dropped),-,-,49,8.566433566433567,union of all rules over 572 episodes

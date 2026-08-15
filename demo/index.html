@@ -320,9 +320,10 @@
       name: "rl2",
       blurb: "572 episodes with a full operator × scene grid — the only slice where the " +
              "selection experiment can run. Pick a selector and watch which quarter of the data " +
-             "it keeps, then read what that choice cost on held-out episodes.",
-      note: "Barely anything to ring here — this lab is clean. Switch to microagi above to " +
-            "watch the gate actually fire.",
+             "it keeps, then read what that choice cost on held-out episodes. 49 episodes are " +
+             "ringed — hover one for the reason.",
+      note: "49 dropped, for four different reasons: hand placement, jittery tracking, a SLAM " +
+            "jump, and one fragment. Switch to microagi above for over-long episodes.",
       foot: "<strong>What you are looking at.</strong> <span class='mono'>degenerate</span> is a " +
             "deliberate control: it spends the identical budget but concentrates it into about 21 " +
             "operator×scene groups instead of about 73. You can watch it clump, and it costs +7.0% " +
@@ -344,10 +345,9 @@
             "property the trajectory features pick up on their own, not just a duration cut."
     }
   };
-  // Order and default: open on the slice where the quality gate visibly fires. rl2 is the
-  // slice that carries the selection experiment, but it only has 1 drop in 572, so landing
-  // there makes the gate look like it does nothing.
-  const PREFERRED = ["microagi", "rl2"];
+  // rl2 first: it carries the selection experiment *and*, now that the gate has physical
+  // plausibility rules alongside the off-axis one, it has four distinct drop reasons to show.
+  const PREFERRED = ["rl2", "microagi"];
   const IDS = PREFERRED.filter(k => PAYLOAD.datasets[k])
     .concat(Object.keys(PAYLOAD.datasets).filter(k => !PREFERRED.includes(k)));
 
@@ -521,7 +521,10 @@
     too_short: "under 3 seconds",
     no_motion: "hands barely moved",
     tracking_dropout: "missing pose values",
-    frozen_tracker: "pose frozen for over 2s"
+    frozen_tracker: "pose frozen for over 2s",
+    hands_far_off_axis: "hands held far off the camera axis",
+    jittery_hand_track: "hand tracker jumping (>10 m/s)",
+    head_pose_jump: "SLAM relocalised mid-episode"
   };
 
   cv.addEventListener("pointermove", (ev) => {

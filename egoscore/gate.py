@@ -29,9 +29,27 @@ HARD_RULES = [
     ("frozen_tracker", "frozen_run_max_s", 2.0, "gt", "pose held bit-identical for >2s (tracker dropout)"),
     ("too_short", "duration_s", 3.0, "lt", "shorter than 3s — cannot contain a fold"),
     ("no_motion", "path_len_total", 0.10, "lt", "hands travelled <10cm in total"),
-    # Named for what it measures, not for what we first assumed it meant. See the note in
-    # features.py: the angle is solid, the claim "therefore out of frame" is not.
-    ("hands_far_off_axis", "offaxis_max", 0.50, "gt",
+    # Physical-plausibility rules. The thresholds come from what a human hand and head can
+    # actually do, not from tuning until an interesting number of episodes falls out.
+    # Folding laundry a hand moves under 2 m/s; 10 m/s is the tracker jumping, not the person.
+    ("jittery_hand_track", "hand_jitter_frac", 0.01, "gt",
+     "over 1% of frames have a hand moving >10 m/s — the tracker is jumping, not the person"),
+    # Head pose comes from visual-inertial SLAM; a 20 m/s jump is the solver relocalising,
+    # which corrupts every hand pose expressed relative to the head.
+    ("head_pose_jump", "head_speed_max", 20.0, "gt",
+     "head jumps >20 m/s in one frame — SLAM relocalised mid-episode"),
+]
+
+# Rules that are only meaningful on rigs whose keypoint convention we have actually checked.
+#
+# The off-axis angle is computed from the stored keypoints, and the stored convention is NOT
+# shared across labs. On rl2 the median hand sits 26 deg off the optical axis, which is what
+# you would expect of someone working in front of themselves. On microagi the same arithmetic
+# returns 160 deg -- behind the camera -- which cannot be right, so their keypoints are in a
+# different frame. Rather than guess at a per-lab convention, the rule only runs where we
+# verified it.
+RIG_SCOPED_RULES = [
+    ("hands_far_off_axis", "offaxis_max", 0.50, "gt", {"rl2"},
      "a hand is held >45 deg off the camera axis for most of the episode"),
 ]
 
@@ -65,6 +83,21 @@ def apply_gate(df: pd.DataFrame) -> pd.DataFrame:
         for i in np.flatnonzero(hit.to_numpy()):
             reasons[i].append(name)
 
+    for name, col, thresh, op, labs, _desc in RIG_SCOPED_RULES:
+        if col not in out.columns:
+            out[f"rule_{name}"] = False
+            continue
+        v = out[col].astype(float)
+        hit = (v > thresh) if op == "gt" else (v < thresh)
+        hit = hit.fillna(False)
+        if "lab" in out.columns:
+            hit = hit & out["lab"].isin(labs)
+        elif not labs:
+            hit = hit & False
+        out[f"rule_{name}"] = hit
+        for i in np.flatnonzero(hit.to_numpy()):
+            reasons[i].append(name)
+
     for name, col, mult, op, _desc in MEDIAN_MULTIPLE_RULES:
         if col not in out.columns:
             out[f"rule_{name}"] = False
@@ -93,6 +126,16 @@ def describe_thresholds(gated: pd.DataFrame) -> pd.DataFrame:
             continue
         rows.append({
             "rule": name, "signal": col, "test": f"{op} {thresh}",
+            "n_flagged": int(gated[c].sum()),
+            "pct": 100.0 * gated[c].mean(),
+            "meaning": desc,
+        })
+    for name, col, thresh, op, labs, desc in RIG_SCOPED_RULES:
+        c = f"rule_{name}"
+        if c not in gated:
+            continue
+        rows.append({
+            "rule": name, "signal": col, "test": f"{op} {thresh} (labs: {','.join(sorted(labs))})",
             "n_flagged": int(gated[c].sum()),
             "pct": 100.0 * gated[c].mean(),
             "meaning": desc,
