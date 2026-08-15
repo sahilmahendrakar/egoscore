@@ -12,6 +12,9 @@ OUT = ROOT / "demo" / "egoscore_deck.html"
 FIGURES = {
     "__FIG_MANIFOLD__": FIGS / "manifold_compare.png",
     "__FIG_PAIRED__": FIGS / "paired.png",
+    "__FIG_GATE__": FIGS / "gate_examples.png",
+    "__FIG_SELECTORS__": FIGS / "selectors_explained.png",
+    "__FIG_MSE__": FIGS / "mse_explained.png",
 }
 
 html = TPL.read_text()

@@ -15,7 +15,11 @@ import pandas as pd
 HARD_RULES = [
     ("tracking_dropout", "nan_max", 0.05, "gt", "non-finite pose/keypoint values in >5% of frames"),
     ("frozen_tracker", "frozen_run_max_s", 2.0, "gt", "pose held bit-identical for >2s (tracker dropout)"),
-    ("hands_out_of_frame", "oof_max", 0.50, "gt", "a hand projects outside the image in >50% of frames"),
+    # Visual usability only. The hand *pose* stays valid when a hand leaves the RGB frame
+    # (Aria tracks hands from its SLAM cameras, and nan_max is 0 for every such episode),
+    # so this rule matters for a vision-conditioned policy and not for our proprioceptive
+    # proxy. We therefore cannot validate it with our own metric, and say so in the report.
+    ("hands_out_of_frame", "oof_max", 0.50, "gt", "a hand is outside the RGB image in >50% of frames"),
     ("too_short", "duration_s", 3.0, "lt", "shorter than 3s — cannot contain a fold"),
     ("no_motion", "path_len_total", 0.10, "lt", "hands travelled <10cm in total"),
 ]

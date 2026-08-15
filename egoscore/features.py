@@ -102,11 +102,21 @@ def quality_signals(ep: dict[str, np.ndarray]) -> dict:
 
     # --- hands in frame ---------------------------------------------------
     # Keypoints live in a camera frame with -z forward (verified empirically: z is
-    # negative for every episode in the slice). The principal point sits exactly at
-    # the image centre, so the in-frustum test reduces to a symmetric bound on the
-    # projected offsets — which makes it invariant to the sign convention on y, and
-    # therefore something we do not have to guess.
-    fx, fy = ARIA_K[0, 0], ARIA_K[1, 1]
+    # negative for every episode in the slice).
+    #
+    # The camera is a FISHEYE, not a pinhole. This matters enormously and it is easy
+    # to get wrong: the stored intrinsics are a 3x4 K matrix, which invites a pinhole
+    # projection u = f*x/z. Under pinhole, a wrist 60 deg off-axis lands at
+    # r = f*tan(60) = 462 px and reads as "outside a 640x480 frame" -- while the actual
+    # fisheye image shows it perfectly well at r = f*theta = 279 px.
+    #
+    # We caught this by rendering the frames of the episodes the gate dropped and
+    # seeing hands in every one (scripts/19_episode_strips.py). Using the equidistant
+    # fisheye model r = f*theta instead, off-axis hands are correctly counted as visible.
+    #
+    # Aria's real model is fisheye624; equidistant is an approximation, but it is the
+    # right *family*, and the pinhole alternative is simply wrong.
+    f_px = float(ARIA_K[0, 0])
     hw, hh = IMG_W / 2.0, IMG_H / 2.0
     oof = []
     for name, a in [("left", lkp), ("right", rkp)]:
@@ -115,16 +125,26 @@ def quality_signals(ep: dict[str, np.ndarray]) -> dict:
             oof.append(1.0)
             continue
         k = _kp(np.nan_to_num(a))
-        wrist = k[:, 0, :]  # MANO keypoint 0 is the wrist
-        fwd = -wrist[:, 2]
-        valid = fwd > 1e-6
-        u = np.abs(fx * wrist[:, 0] / np.where(valid, fwd, 1.0))
-        v = np.abs(fy * wrist[:, 1] / np.where(valid, fwd, 1.0))
-        inside = valid & (u < hw) & (v < hh)
-        f = float(1.0 - inside.mean())
-        out[f"oof_{name}"] = f
-        oof.append(f)
+        # Centroid of all 21 keypoints, not the wrist alone: at the frame edge the wrist
+        # routinely falls outside while most of the hand is still visible, and it is the
+        # hand we care about seeing.
+        hand = k.mean(axis=1)
+        fwd = -hand[:, 2]
+        rad = np.linalg.norm(hand[:, :2], axis=1)
+        theta = np.arctan2(rad, fwd)          # angle from the optical axis
+        r_px = f_px * theta                   # equidistant fisheye
+        denom = np.maximum(rad, 1e-9)
+        u = np.abs(r_px * hand[:, 0] / denom)
+        v = np.abs(r_px * hand[:, 1] / denom)
+        # theta > pi/2 means genuinely behind the camera, which no lens recovers.
+        inside = (theta < np.pi / 2) & (u < hw) & (v < hh)
+        frac = float(1.0 - inside.mean())
+        out[f"oof_{name}"] = frac
+        oof.append(frac)
     out["oof_max"] = float(max(oof))
+    out["wrist_offaxis_deg_p50"] = float(
+        np.degrees(np.median(theta)) if lkp is not None and len(lkp) else 0.0
+    )
 
     # --- motion -----------------------------------------------------------
     speeds = []

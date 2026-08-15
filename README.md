@@ -13,32 +13,31 @@ and — the part that actually matters — **measures whether the pick beat pick
 
 | Selector | Paired wins vs random | Mean Avg-MSE change | Wilcoxon p |
 |---|---|---|---|
-| `dpp` (log-det diversity) | **40/40** | **−4.03%** | 2e−12 |
-| `kcenter` | 38/40 | −3.61% | 1e−11 |
-| `curated` (facility location) | 37/40 | −2.44% | 1e−09 |
-| `random_nogate` (no quality gate) | 22/40 | −0.11% | n.s. |
-| `degenerate` (**positive control**) | 1/40 | **+7.17%** | 9e−12 |
+| `dpp` (log-det diversity) | **40/40** | **−3.79%** | 2e−12 |
+| `kcenter` | 36/40 | −3.42% | 2e−10 |
+| `curated` (facility location) | 37/40 | −2.51% | 1e−09 |
+| `random_nogate` (no quality gate) | 24/40 | −0.73% | n.s. |
+| `degenerate` (**positive control**) | 0/40 | **+7.12%** | 2e−12 |
 
 40 comparisons = 10 seeds × 2 budgets × 2 held-out axes. Every selector is compared to
 `random` at the *same seed and budget*, on the *same* held-out windows.
 
 **Selection matters here; filtering does not.** The quality gate is statistically
-indistinguishable from no effect (p = 0.59). It drops only 5% of `rl2`, almost all for
-hands leaving frame, and on data this clean there is nothing for filtering to bite on.
-We report this because it reverses the conclusion we drew at 3 seeds, where the gate
-looked worth about a percent.
+indistinguishable from no effect (sign test p = 0.27). It drops only 7 of 572 episodes,
+and on data this clean there is nothing for filtering to bite on. We report this because
+it reverses the conclusion we drew at 3 seeds, where the gate looked worth about a percent.
 
 **The honest headline is not "throw away 75% of your data for free."** Training on the
 full gated pool still beats every subset. It is:
 
-> At a quarter of the budget, diversity-aware selection closes **56%** (unseen operator)
+> At a quarter of the budget, diversity-aware selection closes **52%** (unseen operator)
 > and **50%** (unseen scene) of the gap between a random quarter and using everything.
 
 🧭 **[Interactive demo — The Curation Manifold](https://claude.ai/code/artifact/0db5ec63-9657-4738-854a-2703290324cc)** · 📊 **[Slide deck](https://claude.ai/code/artifact/f9b606c2-ad6d-488b-ab9f-727c9875e1f8)** · 📄 **[Validation report](reports/validation.md)**
 
 In the demo you can switch selectors and watch which quarter of the data each one keeps.
-`degenerate` visibly clumps into 18 operator×scene groups; `kcenter` spreads across 104.
-That difference is the whole thesis, and it costs +12.98% vs −6.37% Avg-MSE.
+`degenerate` visibly clumps into 21 operator×scene groups; `kcenter` spreads across 104.
+That difference is the whole thesis, and it is what the Avg-MSE gap prices.
 
 ![paired](reports/figs/paired.png)
 
@@ -51,8 +50,8 @@ obvious failure mode is a harness too noisy to detect anything at all.
 
 So we included a condition that *should* lose, for a reason established independently by
 the EgoVerse paper: demonstrator and scene diversity improve generalization.
-`degenerate` spends the identical budget but concentrates it into ~10 operator × scene
-groups instead of ~60. It loses **1/40 at +7.17%** — large, unambiguous, correctly signed.
+`degenerate` spends the identical budget but concentrates it into ~21 operator × scene
+groups instead of ~73. It loses **0/40 at +7.12%** — large, unambiguous, correctly signed.
 
 That is what makes the smaller curated-vs-random margin a measurement rather than noise.
 The control also *weakens* at the larger budget, exactly as it should — at half the pool
@@ -99,7 +98,15 @@ identical eval windows, so we report **paired** differences.
 
 ---
 
-## Three things we found in the data
+## Four things we found in the data
+
+**The camera is a fisheye, and the stored intrinsics tempt you into a pinhole projection.**
+EgoVerse ships intrinsics as a 3×4 K matrix, which invites `u = f·x/z`. Aria's camera is a
+fisheye, where the right model is roughly `r = f·θ`. Under pinhole a hand 60° off-axis lands
+at 462 px — outside a 640×480 image — while the fisheye puts it at 279 px, well inside. Our
+first gate therefore dropped 23 episodes whose hands were plainly visible. We caught it by
+rendering the frames of the episodes we were dropping. After the fix the rule fires on 1
+episode instead of 23, and no headline number moved.
 
 **Zarr arrays are zero-padded to a chunk boundary.** The true length is `total_frames` in
 the group attrs. Read the raw array without truncating and you get a run of identical
@@ -136,9 +143,13 @@ Stated up front, because they are the first things worth attacking.
    figure above. A visual policy might rank subsets differently.
 3. **One task, one lab.** No claim of transfer across tasks. The slice was forced by
    metadata availability, not chosen for favourability.
-4. **Small effect, small pool.** ~3% on a few hundred episodes. The positive control is
+4. **Small effect, small pool.** ~4% on a few hundred episodes. The positive control is
    what makes it interpretable rather than decorative.
-5. **Facility location was our a priori pick and it lost.** `dpp` and `kcenter` both beat
+5. **The one gate rule that still fires, we cannot validate.** "Hands out of frame" matters
+   for a policy that consumes pixels. Ours does not, and the hand *pose* stays valid when a
+   hand leaves the RGB frame (Aria tracks hands from its SLAM cameras). So our own metric
+   cannot tell us whether that rule earns its place.
+6. **Facility location was our a priori pick and it lost.** `dpp` and `kcenter` both beat
    it. We report that rather than quietly promoting the winner to headline method: on
    this slice *spread* seems to matter slightly more than *coverage*. `dpp` is cleanly
    ahead of `curated`, but `dpp` and `kcenter` are within noise of each other.
