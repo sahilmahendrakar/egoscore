@@ -266,15 +266,21 @@
       <div class="card bad"><span class="k">Attempt 2</span>
         <p>Transform by the head pose first, then project.
           <strong>0 of 42</strong> keypoints land in frame.</p></div>
-      <div class="card accent"><span class="k">What we did</span>
-        <p>Deleted the rule. We could not establish the stored coordinate convention, so every
-          number it produced was unfounded.</p></div>
+      <div class="card bad"><span class="k">Attempt 3</span>
+        <p>Skip the geometry: run MediaPipe on the pixels. It finds hands in only
+          <strong>59%</strong> of frames, and the 36 episodes it scores at <strong>0%</strong>
+          plainly show hands.</p></div>
     </div>
+    <p class="big">Three independent methods, none of them usable. This footage — fisheye, extreme
+      angle, hands entering at the frame edge — defeats both the geometry and an off-the-shelf
+      detector. So we deleted the rule instead of shipping a number we can't defend.</p>
     <p class="big">The remaining six rules use durations, distances and NaN counts only. None of
       them touches camera geometry, which is also why they compare cleanly across labs.</p>
     <p>Worth saying out loud: the histogram of that signal looked perfectly reasonable. Nothing
       about it flagged itself as wrong. Rendering the frames is what caught it, and we only did
       that because we wanted a picture for a slide.</p>
+    <p class="cite">Where the original rule happened to agree with a human eye, that was
+      coincidence. Two later methods disagree with it and with each other.</p>
   </section>
 
   <!-- 8 -->
@@ -375,12 +381,37 @@
         <tr class="ctrl"><td>degenerate (the control)</td><td class="num">1/40</td><td class="num pos">+7.01%</td><td class="num">1e−11</td></tr>
       </tbody>
     </table></div>
-    <p><strong>Choosing well matters. Filtering doesn't — here.</strong> Skipping the gate costs
-      nothing measurable on rl2, which makes sense: it only drops 1 episode in 572. On microagi,
-      where it drops 1 in 7, it would presumably matter a great deal. We can't test that, because
-      microagi has no operator or scene labels to hold out.</p>
+    <p><strong>Both halves pay, but you have to look in the right place.</strong> Skipping the
+      gate costs nothing measurable on rl2, and it shouldn't: the gate only drops 1 episode in 572
+      there. We measured the gate separately on microagi, where it drops 1 in 7. Next slide.</p>
     <p class="cite">This also reverses what we said after 3 seeds, when the gate looked worth about
       a percent. Ten seeds killed it.</p>
+  </section>
+
+  <!-- 14b -->
+  <section class="slide">
+    <div class="eyebrow">Pricing the gate</div>
+    <h2>The long episodes are worse frame for frame</h2>
+    <p>microagi has no operator or scene labels, so the selection experiment can't run there.
+      But pricing the <em>gate</em> needs less: just a held-out set, not a held-out axis. Hold
+      out a random quarter, train on the rest with and without the runaway episodes, compare.</p>
+    <div class="tblwrap"><table>
+      <thead><tr><th>Budget matched on</th><th class="num">Training windows</th><th class="num">Gate wins</th><th class="num">Avg-MSE</th><th class="num">p</th></tr></thead>
+      <tbody>
+        <tr><td>episodes</td><td class="num">16,193 vs 31,237</td><td class="num">1/10</td><td class="num pos">+1.68%</td><td class="num">0.004</td></tr>
+        <tr class="hero"><td>frames</td><td class="num">16,193 vs 16,233</td><td class="num">10/10</td><td class="num neg">−4.66%</td><td class="num">0.002</td></tr>
+      </tbody>
+    </table></div>
+    <p class="big">Match on episode count and the gate looks harmful. That's an artefact: a runaway
+      episode carries sixty times the frames of a normal one, so the ungated arm was quietly
+      training on twice the data.</p>
+    <p><strong>Match on frames and the gate wins every single seed.</strong> The runaway episodes
+      were never better data — they were just more of it. Drop them and you get a 4.7% better model
+      from the same number of training frames.</p>
+    <p class="cite">Held-out episodes come from the same pool, so this is in-distribution: it says
+      the runaway episodes are worse to train on. It does not say anything about transfer to a new
+      operator — that's what rl2 is for. And it is a second reason to budget curation in seconds
+      rather than episodes.</p>
   </section>
 
   <!-- 15 -->

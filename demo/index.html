@@ -321,7 +321,8 @@
       blurb: "572 episodes with a full operator × scene grid — the only slice where the " +
              "selection experiment can run. Pick a selector and watch which quarter of the data " +
              "it keeps, then read what that choice cost on held-out episodes.",
-      note: "Barely anything to ring here. This lab is clean: 1 episode in 572.",
+      note: "Barely anything to ring here — this lab is clean. Switch to microagi above to " +
+            "watch the gate actually fire.",
       foot: "<strong>What you are looking at.</strong> <span class='mono'>degenerate</span> is a " +
             "deliberate control: it spends the identical budget but concentrates it into about 21 " +
             "operator×scene groups instead of about 73. You can watch it clump, and it costs +7.0% " +
@@ -332,8 +333,10 @@
       name: "microagi",
       blurb: "1,200 episodes sampled from the largest fold_clothes slice. It has no operator or " +
              "scene labels, so no selection experiment is possible — but this is where the " +
-             "quality gate actually does something. Hover a ringed dot to see why it went.",
-      note: "Every ringed dot ran more than 3× this lab's median episode length.",
+             "quality gate actually does something: 167 of these 1,200 episodes get dropped. " +
+             "Hover a ringed dot to see the frame and the reason.",
+      note: "Every ringed dot ran more than 3× this lab's median episode length. Switch to rl2 " +
+            "above for the selection experiment and the Avg-MSE numbers.",
       foot: "<strong>What you are looking at.</strong> 167 of 1,200 episodes ran more than three " +
             "times this lab's median length of 10.6s — the longest is 797s. Hover one: the frame " +
             "is mid-way through what is really a whole folding session, labelled as a single " +
@@ -341,7 +344,12 @@
             "property the trajectory features pick up on their own, not just a duration cut."
     }
   };
-  const IDS = Object.keys(PAYLOAD.datasets);
+  // Order and default: open on the slice where the quality gate visibly fires. rl2 is the
+  // slice that carries the selection experiment, but it only has 1 drop in 572, so landing
+  // there makes the gate look like it does nothing.
+  const PREFERRED = ["microagi", "rl2"];
+  const IDS = PREFERRED.filter(k => PAYLOAD.datasets[k])
+    .concat(Object.keys(PAYLOAD.datasets).filter(k => !PREFERRED.includes(k)));
 
   let dsId = location.hash.replace("#", "");
   if (!PAYLOAD.datasets[dsId]) dsId = IDS[0];

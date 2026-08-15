@@ -57,6 +57,9 @@ $PY scripts/11_slide.py
 echo "==> 13: proxy-hyperparameter sensitivity sweep"
 $PY scripts/13_sensitivity.py
 
+echo "==> 25: price the quality gate on microagi (equal-episode vs equal-frame budget)"
+$PY scripts/25_gate_value.py microagi
+
 echo "==> 14-18: demo thumbnails, projection, demo page and slide deck"
 $PY scripts/14_fetch_thumbs.py rl2
 $PY scripts/14_fetch_thumbs.py microagi 1200

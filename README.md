@@ -100,13 +100,22 @@ identical eval windows, so we report **paired** differences.
 
 ## Four things we found in the data
 
+**We priced the gate where it actually fires.** On microagi, hold out a random quarter and
+train with and without the runaway episodes. Matched on *episode count* the gate looks harmful
+(+1.68%, 1/10 seeds) — but that is an artefact, because a runaway episode carries 60× the
+frames and the ungated arm was training on twice the data. Matched on *frames*, the gate wins
+**10/10 seeds at −4.66% Avg-MSE** (p = 0.002). The long episodes were never better data, just
+more of it.
+
 **We deleted a rule we could not prove.** An earlier gate projected hand keypoints into the
 camera image and flagged "hands out of frame", dropping 23 episodes. Rendering those frames
 showed hands in plain view in every one. We tried two projection models — keypoints as
 camera-frame points, and keypoints transformed by the head pose first — and under both,
 **zero of 42 keypoints** land inside the image on frames where the hands are obviously
-visible (`scripts/22_projection_check.py`). Rather than guess a third time we removed the
-rule. The six surviving rules use durations, distances and NaN counts only, touch no camera
+visible (`scripts/22_projection_check.py`). A third attempt skipped the geometry entirely and
+ran MediaPipe on the pixels: it detects hands in only 59% of frames, and the 36 episodes it
+scores at 0% plainly show hands (`scripts/24_hand_visibility.py`). Three methods, none usable
+on this fisheye view, so we removed the rule. The six surviving rules use durations, distances and NaN counts only, touch no camera
 geometry, and therefore compare cleanly across labs.
 
 **Episode segmentation is wildly inconsistent between labs, and the gate can see it.**
