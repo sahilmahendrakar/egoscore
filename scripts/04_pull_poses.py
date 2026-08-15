@@ -43,11 +43,18 @@ WANTED = [
 ]
 
 LAB = sys.argv[1] if len(sys.argv) > 1 else "rl2"
+LIMIT = int(sys.argv[2]) if len(sys.argv) > 2 else 0
 
 df = pd.read_csv(REPORTS / "slice_fold_clothes.csv")
 sel = df[(df["lab"] == LAB) & (df["embodiment"] == "human_bimanual")]
 sel = sel[sel["zarr_processed_path"].fillna("").str.strip() != ""].reset_index(drop=True)
+if LIMIT and len(sel) > LIMIT:
+    # Deterministic subsample, so the audit is reproducible.
+    sel = sel.sample(n=LIMIT, random_state=0).reset_index(drop=True)
 print(f"{LAB}: {len(sel)} episodes to pull")
+
+OUT = OUT.parent / f"poses_{LAB}" if LAB != "rl2" else OUT
+OUT.mkdir(parents=True, exist_ok=True)
 
 creds = load_creds()
 fs = r2_fs(creds)

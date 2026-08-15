@@ -1,0 +1,15 @@
+boto3
+psycopg[binary]
+sqlalchemy
+pandas
+numpy
+scipy
+scikit-learn
+zarr>=3
+numcodecs
+s3fs
+simplejpeg
+opencv-python-headless
+matplotlib
+tqdm
+tabulate

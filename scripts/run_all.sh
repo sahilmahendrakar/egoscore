@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# Reproduce the whole EgoScore result from a clean checkout.
+#
+# Prerequisite: EgoVerse's public read-only AWS keys on disk. They are published in the
+# EgoVerse README; write them to ~/.egoverse_aws_credentials in aws-credentials format:
+#
+#   [default]
+#   aws_access_key_id = <key from EgoVerse README>
+#   aws_secret_access_key = <secret from EgoVerse README>
+#   region = us-east-2
+#
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+PY=${PY:-.venv/bin/python}
+
+if [ ! -x "$PY" ]; then
+  echo "==> creating venv"
+  uv venv .venv --python 3.11
+  uv pip install --python .venv/bin/python -r requirements.txt
+fi
+
+echo "==> 01: survey the episode table"
+$PY scripts/01_survey.py
+
+echo "==> 02: profile the fold_clothes slice"
+$PY scripts/02_profile_slice.py
+
+echo "==> 04: pull pose arrays for rl2 (~10 min, 1.2 GB)"
+$PY scripts/04_pull_poses.py rl2
+
+echo "==> 06: extract quality signals + embedding features"
+$PY scripts/06_extract_features.py
+
+echo "==> 07: run the experiment (gate, selection, Avg-MSE)"
+$PY scripts/07_experiment.py
+
+echo "==> 08: paired analysis + figures"
+$PY scripts/08_analyze.py
+
+echo "==> 09: generate the validation report"
+$PY scripts/09_report.py
+
+echo
+echo "Done. See reports/validation.md"
