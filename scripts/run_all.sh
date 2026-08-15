@@ -41,8 +41,9 @@ $PY scripts/07_experiment.py
 echo "==> 08: paired analysis + figures"
 $PY scripts/08_analyze.py
 
-echo "==> 04b: pull a mecka sample for the cross-lab audit (~6 min)"
+echo "==> 04b: pull mecka + microagi samples for the cross-lab audit (~20 min)"
 $PY scripts/04_pull_poses.py mecka 400
+$PY scripts/04_pull_poses.py microagi 1200
 
 echo "==> 10: cross-lab quality audit"
 $PY scripts/10_cross_lab_audit.py
@@ -61,6 +62,9 @@ $PY scripts/14_fetch_thumbs.py
 $PY scripts/15_demo_data.py
 $PY scripts/16_build_demo.py
 $PY scripts/17_manifold_fig.py
+$PY scripts/19_episode_strips.py microagi
+$PY scripts/20_selector_explainer.py
+$PY scripts/21_mse_explainer.py
 $PY scripts/18_build_deck.py
 
 echo

@@ -1,4 +1,4 @@
 lab,n_episodes,tracking_dropout,frozen_tracker,too_short,no_motion,runaway_length,suspiciously_short,ANY,median_dur_s,median_motion
 mecka,400,0.0%,0.0%,1.2%,0.0%,0.0%,0.0%,1.2%,7,0.34
-microagi,277,0.0%,0.0%,0.0%,0.0%,15.9%,0.0%,15.9%,11,0.39
+microagi,1200,0.0%,0.0%,0.0%,0.0%,13.9%,0.0%,13.9%,11,0.38
 rl2,572,0.0%,0.0%,0.0%,0.0%,0.0%,0.2%,0.2%,93,0.55

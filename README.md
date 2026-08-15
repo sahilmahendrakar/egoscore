@@ -111,8 +111,8 @@ geometry, and therefore compare cleanly across labs.
 
 **Episode segmentation is wildly inconsistent between labs, and the gate can see it.**
 `rl2` drops 1 episode in 572. `mecka` drops 1.2%. `microagi` — the largest fold_clothes
-slice at 9,896 episodes — drops **15.9%**, all of them recordings running more than 3× that
-lab's median episode length. One in six "episodes" there is a whole folding session rather
+slice at 9,896 episodes — drops **13.9%**, all of them recordings running more than 3× that
+lab's median episode length. One in seven "episodes" there is a whole folding session rather
 than a single demonstration.
 
 **Zarr arrays are zero-padded to a chunk boundary.** The true length is `total_frames` in

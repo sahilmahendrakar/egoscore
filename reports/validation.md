@@ -15,19 +15,19 @@
 
 | Selector | Paired wins vs random | Mean Avg-MSE change | Wilcoxon p |
 |---|---|---|---|
-| `dpp` | 40/40 | **-3.79%** | 1.8e-12 |
-| `kcenter` | 36/40 | **-3.42%** | 2.0e-10 |
-| `curated` | 37/40 | **-2.51%** | 1.2e-09 |
-| `random_nogate` | 24/40 | **-0.73%** | 1.4e-02 |
-| `degenerate` | 0/40 | **+7.12%** | 1.8e-12 |
+| `dpp` | 40/40 | **-3.77%** | 1.8e-12 |
+| `kcenter` | 37/40 | **-3.44%** | 6.0e-11 |
+| `curated` | 36/40 | **-2.39%** | 1.4e-09 |
+| `random_nogate` | 10/40 | **+0.16%** | 3.0e-01 |
+| `degenerate` | 1/40 | **+7.01%** | 1.3e-11 |
 
 Paired: each selector is compared to `random` at the *same seed and the same budget*,
 evaluated on the *same* held-out windows. 40 comparisons = 10 seeds x 2
 budgets x 2 held-out axes. Wilcoxon signed-rank on the paired differences, two-sided.
 
-- **Diversity-based selection wins consistently.** `dpp` wins 40/40 paired comparisons at -3.79% Avg-MSE (p=2e-12); `kcenter` 36/40; facility location (`curated`) 37/40.
-- **The quality gate does *not* measurably help on this slice.** `random_nogate` is 24/40 at -0.73%, p=0.01 — indistinguishable from no effect. We report this rather than the opposite conclusion we drew at 3 seeds: the gate drops only 5% of `rl2`, almost all for hands leaving frame, and on data this clean filtering has nothing to bite on. **Selection matters here; filtering does not.**
-- **The positive control fires.** `degenerate` — the same budget concentrated into as few operator x scene groups as possible — loses 0/40 at +7.12% (p=2e-12). See below for why this matters more than the headline.
+- **Diversity-based selection wins consistently.** `dpp` wins 40/40 paired comparisons at -3.77% Avg-MSE (p=2e-12); `kcenter` 37/40; facility location (`curated`) 36/40.
+- **The quality gate does *not* measurably help on this slice.** `random_nogate` is 10/40 at +0.16%, sign-test p=0.00 — indistinguishable from no effect. That makes sense: the gate drops 1 of 572 `rl2` episodes, so there is almost nothing for filtering to remove. On `microagi` the same gate drops 15.9%, where it would presumably matter — but `microagi` has no operator or scene labels, so the experiment cannot be run there. **Selection matters here; filtering has nothing to bite on.**
+- **The positive control fires.** `degenerate` — the same budget concentrated into as few operator x scene groups as possible — loses 1/40 at +7.01% (p=1e-11). See below for why this matters more than the headline.
 
 ## Why the positive control is the most important row
 
@@ -40,12 +40,12 @@ So we included a condition that *should* lose, for a reason established independ
 the EgoVerse paper: demonstrator and scene diversity improve generalization. `degenerate`
 spends the identical budget but concentrates it into a handful of operator x scene groups.
 
-At K=25% it is **+14.0%** on unseen operators and **+9.5%** on unseen scenes — a large, unambiguous, correctly-signed effect.
+At K=25% it is **+14.9%** on unseen operators and **+8.3%** on unseen scenes — a large, unambiguous, correctly-signed effect.
 
 That tells us the harness *can* detect a diversity effect of the kind the paper reported.
 The smaller curated-vs-random margin is therefore a measurement, not noise masquerading as one.
 
-Note the control weakens at K=50% (+1.9% / +3.0%), exactly as it should: at half the pool you cannot concentrate the budget very much, so `degenerate` converges toward `random`. A control that stayed constant would have been suspicious.
+Note the control weakens at K=50% (+2.0% / +2.8%), exactly as it should: at half the pool you cannot concentrate the budget very much, so `degenerate` converges toward `random`. A control that stayed constant would have been suspicious.
 
 ## The caveat we are not burying
 
@@ -54,13 +54,13 @@ every 25% and 50% subset, including ours:
 
 | | unseen operator | unseen scene |
 |---|---|---|
-| random, K=25% | 0.11381 | 0.10115 |
-| best selector (dpp), K=25% | 0.10749 | 0.09637 |
-| **all gated data (100%)** | **0.10166** | **0.09149** |
+| random, K=25% | 0.11282 | 0.10173 |
+| best selector (dpp), K=25% | 0.10677 | 0.09633 |
+| **all gated data (100%)** | **0.10160** | **0.09142** |
 
 The honest framing is therefore *not* "throw away 75% of your data for free." It is:
 
-> At a quarter of the budget, diversity-aware selection closes **52%** (unseen operator) / **50%** (unseen scene) of the gap between a random quarter and using everything.
+> At a quarter of the budget, diversity-aware selection closes **54%** (unseen operator) / **52%** (unseen scene) of the gap between a random quarter and using everything.
 
 That is the useful claim for someone deciding what to label, transfer, or train on next.
 
@@ -88,22 +88,40 @@ an identical split and identical evaluation windows, we report **paired** differ
 
 ## Quality gate
 
-7/572 episodes dropped (1.2%).
+1/572 episodes dropped (0.2%).
 
-| rule                    | signal           | test             |   n_flagged |      pct | meaning                                                            |
-|:------------------------|:-----------------|:-----------------|------------:|---------:|:-------------------------------------------------------------------|
-| tracking_dropout        | nan_max          | gt 0.05          |           0 | 0        | non-finite pose/keypoint values in >5% of frames                   |
-| frozen_tracker          | frozen_run_max_s | gt 2.0           |           0 | 0        | pose held bit-identical for >2s (tracker dropout)                  |
-| hands_out_of_frame      | oof_max          | gt 0.5           |           1 | 0.174825 | a hand is outside the RGB image in >50% of frames                  |
-| too_short               | duration_s       | lt 3.0           |           0 | 0        | shorter than 3s — cannot contain a fold                            |
-| no_motion               | path_len_total   | lt 0.1           |           0 | 0        | hands travelled <10cm in total                                     |
-| truncated_or_runaway_hi | duration_s       | gt q0.99 (233.7) |           6 | 1.04895  | duration above the 99th percentile — likely un-segmented recording |
-| ANY (dropped)           | -                | -                |           7 | 1.22378  | union of all rules over 572 episodes                               |
+| rule               | signal           | test                  |   n_flagged |      pct | meaning                                                                          |
+|:-------------------|:-----------------|:----------------------|------------:|---------:|:---------------------------------------------------------------------------------|
+| tracking_dropout   | nan_max          | gt 0.05               |           0 | 0        | non-finite pose/keypoint values in >5% of frames                                 |
+| frozen_tracker     | frozen_run_max_s | gt 2.0                |           0 | 0        | pose held bit-identical for >2s (tracker dropout)                                |
+| too_short          | duration_s       | lt 3.0                |           0 | 0        | shorter than 3s — cannot contain a fold                                          |
+| no_motion          | path_len_total   | lt 0.1                |           0 | 0        | hands travelled <10cm in total                                                   |
+| runaway_length     | duration_s       | gt 3.0x median (278s) |           0 | 0        | more than 3x the median episode length — an un-segmented recording, not one demo |
+| suspiciously_short | duration_s       | lt 0.15x median (14s) |           1 | 0.174825 | under 15% of the median episode length — a fragment, not a demo                  |
+| ANY (dropped)      | -                | -                     |           1 | 0.174825 | union of all rules over 572 episodes                                             |
 
-**What this says about the data:** `rl2` flagship data is clean on the axes people usually
-worry about. Zero episodes have non-finite poses; zero have a frozen tracker. Every drop
-came from hands leaving the frame or from un-segmented long recordings. A gate designed
-around imagined failure modes would have found nothing here.
+**What this says about the data:** `rl2` flagship data is essentially spotless — 1 episode
+in 572. Zero have non-finite poses; zero have a frozen tracker. A gate designed around
+imagined failure modes would find nothing here. The interesting prevalence is elsewhere:
+see the cross-lab section.
+
+### A rule we deleted
+
+An earlier version had a seventh rule that projected hand keypoints into the camera image
+and flagged episodes where the hands left frame. It dropped 23 episodes. We then rendered
+those frames for a figure and the hands were plainly visible in all of them.
+
+We tried two projection models — keypoints as camera-frame points, and keypoints
+transformed by the head pose first. Under both, **zero of the 42 keypoints** land inside
+the image on frames where the hands are obviously visible
+(`scripts/22_projection_check.py`). We could not establish the stored convention, so we
+removed the rule rather than ship a third guess. Every number it produced was unfounded.
+
+The six surviving rules use durations, distances and NaN counts only. None touches camera
+geometry, which is also why they compare cleanly across labs.
+
+The histogram of the deleted signal looked entirely reasonable. Rendering the frames is
+what caught it, and we only did that because we wanted a picture for a slide.
 
 One trap worth recording: zarr arrays are zero-padded up to a chunk boundary, and the true
 length is `total_frames` in the group attrs. Reading the raw array without truncating
@@ -143,10 +161,11 @@ Only the intrinsics-independent signals are compared: hands-out-of-frame depends
 camera intrinsics that we verified for the Aria rig used by `rl2` and have not verified
 for `mecka`, so reporting it cross-lab would be a number we cannot stand behind.
 
-| lab   |   n_episodes | tracking_dropout   | frozen_tracker   | too_short   | no_motion   | ANY   |   median_dur_s |   median_motion |
-|:------|-------------:|:-------------------|:-----------------|:------------|:------------|:------|---------------:|----------------:|
-| mecka |          400 | 0.0%               | 0.0%             | 1.2%        | 0.0%        | 1.2%  |              7 |            0.34 |
-| rl2   |          572 | 0.0%               | 0.0%             | 0.0%        | 0.0%        | 0.0%  |             93 |            0.55 |
+| lab      |   n_episodes | tracking_dropout   | frozen_tracker   | too_short   | no_motion   | runaway_length   | suspiciously_short   | ANY   |   median_dur_s |   median_motion |
+|:---------|-------------:|:-------------------|:-----------------|:------------|:------------|:-----------------|:---------------------|:------|---------------:|----------------:|
+| mecka    |          400 | 0.0%               | 0.0%             | 1.2%        | 0.0%        | 0.0%             | 0.0%                 | 1.2%  |              7 |            0.34 |
+| microagi |         1200 | 0.0%               | 0.0%             | 0.0%        | 0.0%        | 13.9%            | 0.0%                 | 13.9% |             11 |            0.38 |
+| rl2      |          572 | 0.0%               | 0.0%             | 0.0%        | 0.0%        | 0.0%             | 0.2%                 | 0.2%  |             93 |            0.55 |
 
 **Both labs are clean on tracking dropout and frozen trackers — 0.0% in each.** That is a
 genuine finding about EgoVerse rather than a null result: the pose pipelines are solid,

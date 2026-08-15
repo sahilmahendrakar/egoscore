@@ -231,15 +231,15 @@
         <tr><td>frozen tracker</td><td>pose repeats bit-for-bit for over 2 seconds</td><td class="num">0%</td><td class="num">0%</td><td class="num">0%</td></tr>
         <tr><td>too short</td><td>under 3 seconds, can't contain a fold</td><td class="num">0%</td><td class="num">1.2%</td><td class="num">0%</td></tr>
         <tr><td>no motion</td><td>hands travelled under 10 cm in total</td><td class="num">0%</td><td class="num">0%</td><td class="num">0%</td></tr>
-        <tr class="hero"><td>runaway length</td><td>over 3x the lab's median length — a session, not a demo</td><td class="num">0%</td><td class="num">0%</td><td class="num">15.9%</td></tr>
+        <tr class="hero"><td>runaway length</td><td>over 3x the lab's median length — a session, not a demo</td><td class="num">0%</td><td class="num">0%</td><td class="num">13.9%</td></tr>
         <tr><td>fragment</td><td>under 15% of the lab's median length</td><td class="num">0.2%</td><td class="num">0%</td><td class="num">0%</td></tr>
       </tbody>
     </table></div>
     <p class="big"><strong>rl2 is essentially spotless: 1 episode in 572.</strong> The biggest slice
-      of fold_clothes data, microagi, drops <strong>1 in 6</strong>.</p>
+      of fold_clothes data, microagi, drops <strong>1 in 7</strong>.</p>
     <p class="cite">A note on the thresholds: we started with a 99th-percentile rule and threw it out.
       A percentile drops exactly 1% of whatever you point it at, clean or filthy, so it can't
-      tell you anything. A multiple of the median can come back 0% or 16%, and here it does both.</p>
+      tell you anything. A multiple of the median can come back 0% or 14%, and here it does both.</p>
   </section>
 
   <!-- 6 -->
@@ -377,7 +377,7 @@
     </table></div>
     <p><strong>Choosing well matters. Filtering doesn't — here.</strong> Skipping the gate costs
       nothing measurable on rl2, which makes sense: it only drops 1 episode in 572. On microagi,
-      where it drops 1 in 6, it would presumably matter a great deal. We can't test that, because
+      where it drops 1 in 7, it would presumably matter a great deal. We can't test that, because
       microagi has no operator or scene labels to hold out.</p>
     <p class="cite">This also reverses what we said after 3 seeds, when the gate looked worth about
       a percent. Ten seeds killed it.</p>
@@ -475,7 +475,7 @@
       <li><strong>One task, one lab.</strong> We can't claim this transfers. We didn't choose
         <span class="mono">rl2</span> because it suited us, we chose it because it was the only
         slice with the metadata.</li>
-      <li><strong>We can't price the gate where it matters.</strong> It drops 1 in 6 microagi
+      <li><strong>We can't price the gate where it matters.</strong> It drops 1 in 7 microagi
         episodes and 1 in 572 rl2 episodes, but only rl2 has the operator and scene labels our
         experiment needs. So the place the gate does something is the place we can't measure it.</li>
       <li><strong>Facility location was our pick going in, and it lost</strong> to log-det and
