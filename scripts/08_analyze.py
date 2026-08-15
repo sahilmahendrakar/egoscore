@@ -55,14 +55,27 @@ paired.to_csv(REPORTS / "paired_deltas.csv", index=False)
 print("=== paired vs random, same seed & budget (negative % = better) ===")
 print(paired.to_string(index=False))
 
-# Sign test across all paired comparisons (both metrics, both budgets).
-print("\n=== overall win rate vs random (both metrics, both budgets, 3 seeds) ===")
+# Sign test + Wilcoxon signed-rank across all paired comparisons.
+from scipy.stats import binomtest, wilcoxon
+
+n_seeds = res["seed"].nunique()
+print(f"\n=== overall vs random (both metrics, both budgets, {n_seeds} seeds) ===")
+overall = []
 for cond in ["curated", "dpp", "kcenter", "degenerate", "random_nogate"]:
     g = sub[sub.condition == cond]
-    wins = int(sum((g[f"delta_{m}"] < 0).sum() for m in METRICS))
-    tot = len(g) * len(METRICS)
-    mean_pct = float(np.mean([g[f"pct_{m}"].mean() for m in METRICS]))
-    print(f"  {cond:14s} {wins:2d}/{tot:2d} paired wins   mean {mean_pct:+.2f}% Avg-MSE")
+    deltas = np.concatenate([g[f"delta_{m}"].to_numpy() for m in METRICS])
+    pcts = np.concatenate([g[f"pct_{m}"].to_numpy() for m in METRICS])
+    wins = int((deltas < 0).sum())
+    tot = len(deltas)
+    p_sign = binomtest(wins, tot, 0.5).pvalue
+    # Two-sided Wilcoxon on the paired differences; more powerful than the sign test
+    # because it uses the magnitudes, not just the directions.
+    p_wil = wilcoxon(deltas).pvalue if np.any(deltas != 0) else float("nan")
+    overall.append({"condition": cond, "wins": wins, "n": tot,
+                    "mean_pct": pcts.mean(), "p_sign": p_sign, "p_wilcoxon": p_wil})
+    print(f"  {cond:14s} {wins:2d}/{tot:2d} wins   mean {pcts.mean():+.2f}%   "
+          f"sign p={p_sign:.2e}   wilcoxon p={p_wil:.2e}")
+pd.DataFrame(overall).to_csv(REPORTS / "significance.csv", index=False)
 
 # ------------------------------------------------------------------ figure 1
 fig, axes = plt.subplots(1, 2, figsize=(12, 4.6))

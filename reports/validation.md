@@ -13,21 +13,21 @@
 
 ## Headline results
 
-| Selector | Paired wins vs random | Mean Avg-MSE change |
-|---|---|---|
-| `dpp` | 12/12 | **-3.63%** |
-| `kcenter` | 11/12 | **-3.42%** |
-| `curated` | 11/12 | **-2.40%** |
-| `random_nogate` | 3/12 | **+1.05%** |
-| `degenerate` | 1/12 | **+6.50%** |
+| Selector | Paired wins vs random | Mean Avg-MSE change | Wilcoxon p |
+|---|---|---|---|
+| `dpp` | 40/40 | **-4.03%** | 1.8e-12 |
+| `kcenter` | 38/40 | **-3.61%** | 1.3e-11 |
+| `curated` | 37/40 | **-2.44%** | 9.7e-10 |
+| `random_nogate` | 22/40 | **-0.11%** | 5.9e-01 |
+| `degenerate` | 1/40 | **+7.17%** | 9.1e-12 |
 
-Paired means: each selector is compared to `random` at the *same seed and the same
-budget*, evaluated on the *same* held-out windows. 12 comparisons = 3 seeds x 2
-budgets x 2 held-out axes.
+Paired: each selector is compared to `random` at the *same seed and the same budget*,
+evaluated on the *same* held-out windows. 40 comparisons = 10 seeds x 2
+budgets x 2 held-out axes. Wilcoxon signed-rank on the paired differences, two-sided.
 
-- **Diversity-based selection wins consistently.** `dpp` wins 12/12 paired comparisons at -3.63% Avg-MSE; `kcenter` 11/12; facility location (`curated`) 11/12.
-- **The quality gate is worth about a percent.** Dropping the gate (`random_nogate`) costs +1.05% — real, but an order of magnitude smaller than the selection effect at K=25%.
-- **The positive control fires.** `degenerate` — the same budget concentrated into as few operator x scene groups as possible — loses 1/12 at +6.50%. See below for why this matters more than the headline.
+- **Diversity-based selection wins consistently.** `dpp` wins 40/40 paired comparisons at -4.03% Avg-MSE (p=2e-12); `kcenter` 38/40; facility location (`curated`) 37/40.
+- **The quality gate does *not* measurably help on this slice.** `random_nogate` is 22/40 at -0.11%, p=0.59 — indistinguishable from no effect. We report this rather than the opposite conclusion we drew at 3 seeds: the gate drops only 5% of `rl2`, almost all for hands leaving frame, and on data this clean filtering has nothing to bite on. **Selection matters here; filtering does not.**
+- **The positive control fires.** `degenerate` — the same budget concentrated into as few operator x scene groups as possible — loses 1/40 at +7.17% (p=9e-12). See below for why this matters more than the headline.
 
 ## Why the positive control is the most important row
 
@@ -40,12 +40,12 @@ So we included a condition that *should* lose, for a reason established independ
 the EgoVerse paper: demonstrator and scene diversity improve generalization. `degenerate`
 spends the identical budget but concentrates it into a handful of operator x scene groups.
 
-At K=25% it is **+13.0%** on unseen operators and **+9.3%** on unseen scenes — a large, unambiguous, correctly-signed effect.
+At K=25% it is **+13.0%** on unseen operators and **+9.5%** on unseen scenes — a large, unambiguous, correctly-signed effect.
 
 That tells us the harness *can* detect a diversity effect of the kind the paper reported.
 The smaller curated-vs-random margin is therefore a measurement, not noise masquerading as one.
 
-Note the control weakens at K=50% (+1.0% / +2.6%), exactly as it should: at half the pool you cannot concentrate the budget very much, so `degenerate` converges toward `random`. A control that stayed constant would have been suspicious.
+Note the control weakens at K=50% (+3.1% / +3.1%), exactly as it should: at half the pool you cannot concentrate the budget very much, so `degenerate` converges toward `random`. A control that stayed constant would have been suspicious.
 
 ## The caveat we are not burying
 
@@ -54,13 +54,13 @@ every 25% and 50% subset, including ours:
 
 | | unseen operator | unseen scene |
 |---|---|---|
-| random, K=25% | 0.10969 | 0.10566 |
-| best selector (dpp), K=25% | 0.10601 | 0.09894 |
-| **all gated data (100%)** | **0.10116** | **0.09417** |
+| random, K=25% | 0.11591 | 0.10285 |
+| best selector (dpp), K=25% | 0.10810 | 0.09751 |
+| **all gated data (100%)** | **0.10208** | **0.09210** |
 
 The honest framing is therefore *not* "throw away 75% of your data for free." It is:
 
-> At a quarter of the budget, diversity-aware selection closes **43%** (unseen operator) / **59%** (unseen scene) of the gap between a random quarter and using everything.
+> At a quarter of the budget, diversity-aware selection closes **56%** (unseen operator) / **50%** (unseen scene) of the gap between a random quarter and using everything.
 
 That is the useful claim for someone deciding what to label, transfer, or train on next.
 
@@ -156,7 +156,8 @@ Stated plainly, because these are the first things worth attacking.
 5. **Facility location was our a priori pick and it is not the winner.** `dpp` and
    `kcenter` both beat it. We are reporting that rather than quietly promoting the winner
    to headline method: on this slice, *spread* appears to matter slightly more than
-   *coverage*, and with 3 seeds we cannot cleanly separate the three.
+   *coverage*. With 10 seeds `dpp` is cleanly ahead of `curated`, but `dpp` and
+   `kcenter` are within noise of each other.
 
 ## Reproducing
 

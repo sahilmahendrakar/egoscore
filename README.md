@@ -11,22 +11,28 @@ and — the part that actually matters — **measures whether the pick beat pick
 
 ## Result
 
-| Selector | Paired wins vs random | Mean Avg-MSE change |
-|---|---|---|
-| `dpp` (log-det diversity) | **12/12** | **−3.63%** |
-| `kcenter` | 11/12 | −3.42% |
-| `curated` (facility location) | 11/12 | −2.40% |
-| `random_nogate` (no quality gate) | 3/12 | +1.05% |
-| `degenerate` (**positive control**) | 1/12 | **+6.50%** |
+| Selector | Paired wins vs random | Mean Avg-MSE change | Wilcoxon p |
+|---|---|---|---|
+| `dpp` (log-det diversity) | **40/40** | **−4.03%** | 2e−12 |
+| `kcenter` | 38/40 | −3.61% | 1e−11 |
+| `curated` (facility location) | 37/40 | −2.44% | 1e−09 |
+| `random_nogate` (no quality gate) | 22/40 | −0.11% | n.s. |
+| `degenerate` (**positive control**) | 1/40 | **+7.17%** | 9e−12 |
 
-12 comparisons = 3 seeds × 2 budgets × 2 held-out axes. Every selector is compared to
+40 comparisons = 10 seeds × 2 budgets × 2 held-out axes. Every selector is compared to
 `random` at the *same seed and budget*, on the *same* held-out windows.
+
+**Selection matters here; filtering does not.** The quality gate is statistically
+indistinguishable from no effect (p = 0.59). It drops only 5% of `rl2`, almost all for
+hands leaving frame, and on data this clean there is nothing for filtering to bite on.
+We report this because it reverses the conclusion we drew at 3 seeds, where the gate
+looked worth about a percent.
 
 **The honest headline is not "throw away 75% of your data for free."** Training on the
 full gated pool still beats every subset. It is:
 
-> At a quarter of the budget, diversity-aware selection closes **43%** (unseen operator)
-> and **59%** (unseen scene) of the gap between a random quarter and using everything.
+> At a quarter of the budget, diversity-aware selection closes **56%** (unseen operator)
+> and **50%** (unseen scene) of the gap between a random quarter and using everything.
 
 📄 **[Full validation report →](reports/validation.md)**
 
@@ -42,12 +48,11 @@ obvious failure mode is a harness too noisy to detect anything at all.
 So we included a condition that *should* lose, for a reason established independently by
 the EgoVerse paper: demonstrator and scene diversity improve generalization.
 `degenerate` spends the identical budget but concentrates it into ~10 operator × scene
-groups instead of ~60. At K=25% it is **+13.0%** on unseen operators and **+9.3%** on
-unseen scenes — large, unambiguous, correctly signed.
+groups instead of ~60. It loses **1/40 at +7.17%** — large, unambiguous, correctly signed.
 
 That is what makes the smaller curated-vs-random margin a measurement rather than noise.
-The control also *weakens* at K=50% (+1.0% / +2.6%), exactly as it should — at half the
-pool you cannot concentrate the budget much. A control that stayed flat would have been
+The control also *weakens* at the larger budget, exactly as it should — at half the pool
+you cannot concentrate the budget much. A control that stayed flat would have been
 suspicious.
 
 ---
@@ -131,8 +136,8 @@ Stated up front, because they are the first things worth attacking.
    what makes it interpretable rather than decorative.
 5. **Facility location was our a priori pick and it lost.** `dpp` and `kcenter` both beat
    it. We report that rather than quietly promoting the winner to headline method: on
-   this slice *spread* seems to matter slightly more than *coverage*, and with 3 seeds we
-   cannot cleanly separate the three.
+   this slice *spread* seems to matter slightly more than *coverage*. `dpp` is cleanly
+   ahead of `curated`, but `dpp` and `kcenter` are within noise of each other.
 
 ---
 

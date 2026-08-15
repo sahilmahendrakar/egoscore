@@ -75,24 +75,36 @@ txt(0.048, 0.8675,
 
 # ---------------------------------------------------------------- results table
 txt(0.035, 0.795, "Result", 18, INK, "bold")
-txt(0.035, 0.762, "3 seeds × 2 budgets × 2 held-out axes = 12 paired tests", 10.5, MUTED)
+N_SEEDS = int(res["seed"].nunique())
+N_TESTS = wr("dpp")[1]
+txt(0.035, 0.762,
+    f"{N_SEEDS} seeds × 2 budgets × 2 held-out axes = {N_TESTS} paired tests", 10.5, MUTED)
 
 txt(0.035, 0.727, "SELECTOR", 9.5, MUTED, "bold")
 txt(0.212, 0.727, "WINS", 9.5, MUTED, "bold")
 txt(0.272, 0.727, "AVG-MSE", 9.5, MUTED, "bold")
 fig.add_artist(plt.Line2D([0.035, 0.345], [0.714, 0.714], color="#d1d5db", lw=1, transform=T))
 
+sig = pd.read_csv(REPORTS / "significance.csv").set_index("condition")
+txt(0.335, 0.727, "p", 9.5, MUTED, "bold")
+
 rows = [("dpp  (log-det diversity)", *wr("dpp")),
         ("kcenter", *wr("kcenter")),
         ("curated  (facility location)", *wr("curated")),
         ("no quality gate", *wr("random_nogate")),
         ("degenerate  (control)", *wr("degenerate"))]
+key = {"dpp  (log-det diversity)": "dpp", "kcenter": "kcenter",
+       "curated  (facility location)": "curated", "no quality gate": "random_nogate",
+       "degenerate  (control)": "degenerate"}
 y = 0.685
 for label, wins, tot, pct in rows:
     hero = label.startswith(("dpp", "degenerate"))
+    p = float(sig.loc[key[label], "p_wilcoxon"])
+    ns = p > 0.05
     txt(0.035, y, label, 12, INK, "bold" if hero else "normal")
     txt(0.212, y, f"{wins}/{tot}", 12, INK, "bold" if hero else "normal")
-    txt(0.272, y, f"{pct:+.2f}%", 12.5, GOOD if pct < 0 else BAD, "bold")
+    txt(0.272, y, f"{pct:+.2f}%", 12.5, MUTED if ns else (GOOD if pct < 0 else BAD), "bold")
+    txt(0.335, y, "n.s." if ns else f"{p:.0e}", 10, MUTED)
     y -= 0.038
 
 # ---------------------------------------------------------------- paired figure
@@ -113,15 +125,16 @@ txt(0.048, 0.445,
 # ---------------------------------------------------------------- three panels
 panels = [
     ("Why the control matters",
-     "A 3% margin on a proxy metric is easy to disbelieve.\n"
+     "A few percent on a proxy metric is easy to disbelieve.\n"
      "So we added a condition that should lose: the same\n"
      "budget concentrated into ~10 operator×scene groups\n"
      "instead of ~60.\n\n"
-     "At K=25% it is +13.0% (unseen operator) / +9.3%\n"
-     "(unseen scene) — large, unambiguous, correctly signed.\n"
-     "The harness detects the diversity effect the EgoVerse\n"
-     "paper reported, so the smaller margin is a\n"
-     "measurement, not noise.", "#f0fdf4", "#86efac"),
+     "It loses 1/40, +7.2% — large, unambiguous, correctly\n"
+     "signed. The harness detects the diversity effect the\n"
+     "EgoVerse paper reported, so the smaller selection\n"
+     "margin is a measurement, not noise.\n\n"
+     "Selection matters here. Filtering does not: the quality\n"
+     "gate is n.s. on data this clean.", "#f0fdf4", "#86efac"),
     ("Three things we found in the data",
      "Zarr arrays are zero-padded to a chunk boundary. Read\n"
      "them raw and the trailing frames look exactly like a\n"

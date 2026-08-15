@@ -29,12 +29,20 @@ for m in METRICS:
     sub[f"pct_{m}"] = 100.0 * sub[f"delta_{m}"] / sub[f"base_{m}"]
 
 
+sig = pd.read_csv(REPORTS / "significance.csv").set_index("condition")
+N_SEEDS = int(res["seed"].nunique())
+
+
 def winrate(cond):
     g = sub[sub.condition == cond]
     wins = int(sum((g[f"delta_{m}"] < 0).sum() for m in METRICS))
     tot = len(g) * len(METRICS)
     pct = float(sum(g[f"pct_{m}"].mean() for m in METRICS) / len(METRICS))
     return wins, tot, pct
+
+
+def pval(cond):
+    return float(sig.loc[cond, "p_wilcoxon"])
 
 
 ceiling = {m: res[res.condition == "all_gated"][m].mean() for m in METRICS}
@@ -65,25 +73,31 @@ w("**Verdict: supported, with a bounded effect size and one important caveat** (
 w("")
 w("## Headline results")
 w("")
-w("| Selector | Paired wins vs random | Mean Avg-MSE change |")
-w("|---|---|---|")
+n_tests = winrate("dpp")[1]
+w("| Selector | Paired wins vs random | Mean Avg-MSE change | Wilcoxon p |")
+w("|---|---|---|---|")
 for cond in ["dpp", "kcenter", "curated", "random_nogate", "degenerate"]:
     wins, tot, pct = winrate(cond)
-    w(f"| `{cond}` | {wins}/{tot} | **{pct:+.2f}%** |")
+    w(f"| `{cond}` | {wins}/{tot} | **{pct:+.2f}%** | {pval(cond):.1e} |")
 w("")
-w("Paired means: each selector is compared to `random` at the *same seed and the same")
-w("budget*, evaluated on the *same* held-out windows. 12 comparisons = 3 seeds x 2")
-w("budgets x 2 held-out axes.")
+w(f"Paired: each selector is compared to `random` at the *same seed and the same budget*,")
+w(f"evaluated on the *same* held-out windows. {n_tests} comparisons = {N_SEEDS} seeds x 2")
+w("budgets x 2 held-out axes. Wilcoxon signed-rank on the paired differences, two-sided.")
 w("")
-w(f"- **Diversity-based selection wins consistently.** `dpp` wins {winrate('dpp')[0]}/12 "
-  f"paired comparisons at {winrate('dpp')[2]:+.2f}% Avg-MSE; `kcenter` {winrate('kcenter')[0]}/12; "
-  f"facility location (`curated`) {winrate('curated')[0]}/12.")
-w(f"- **The quality gate is worth about a percent.** Dropping the gate (`random_nogate`) "
-  f"costs {winrate('random_nogate')[2]:+.2f}% — real, but an order of magnitude smaller than the "
-  f"selection effect at K=25%.")
+w(f"- **Diversity-based selection wins consistently.** `dpp` wins {winrate('dpp')[0]}/{n_tests} "
+  f"paired comparisons at {winrate('dpp')[2]:+.2f}% Avg-MSE (p={pval('dpp'):.0e}); "
+  f"`kcenter` {winrate('kcenter')[0]}/{n_tests}; facility location (`curated`) "
+  f"{winrate('curated')[0]}/{n_tests}.")
+w(f"- **The quality gate does *not* measurably help on this slice.** `random_nogate` is "
+  f"{winrate('random_nogate')[0]}/{n_tests} at {winrate('random_nogate')[2]:+.2f}%, "
+  f"p={pval('random_nogate'):.2f} — indistinguishable from no effect. We report this rather than "
+  f"the opposite conclusion we drew at 3 seeds: the gate drops only 5% of `rl2`, almost all for "
+  f"hands leaving frame, and on data this clean filtering has nothing to bite on. **Selection "
+  f"matters here; filtering does not.**")
 w(f"- **The positive control fires.** `degenerate` — the same budget concentrated into as few "
-  f"operator x scene groups as possible — loses {winrate('degenerate')[0]}/12 at "
-  f"{winrate('degenerate')[2]:+.2f}%. See below for why this matters more than the headline.")
+  f"operator x scene groups as possible — loses {winrate('degenerate')[0]}/{n_tests} at "
+  f"{winrate('degenerate')[2]:+.2f}% (p={pval('degenerate'):.0e}). See below for why this matters "
+  f"more than the headline.")
 w("")
 w("## Why the positive control is the most important row")
 w("")
@@ -215,7 +229,8 @@ w("   control is what makes this interpretable rather than decorative.")
 w("5. **Facility location was our a priori pick and it is not the winner.** `dpp` and")
 w("   `kcenter` both beat it. We are reporting that rather than quietly promoting the winner")
 w("   to headline method: on this slice, *spread* appears to matter slightly more than")
-w("   *coverage*, and with 3 seeds we cannot cleanly separate the three.")
+w(f"   *coverage*. With {N_SEEDS} seeds `dpp` is cleanly ahead of `curated`, but `dpp` and")
+w("   `kcenter` are within noise of each other.")
 w("")
 w("## Reproducing")
 w("")

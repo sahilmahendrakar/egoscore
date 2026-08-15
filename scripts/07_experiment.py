@@ -23,7 +23,7 @@ ROOT = Path(__file__).resolve().parent.parent
 REPORTS = ROOT / "reports"
 POSES = ROOT / "data" / "poses"
 
-SEEDS = [0, 1, 2]
+SEEDS = list(range(10))
 K_FRACS = [0.25, 0.50]
 CONDITIONS = ["random", "curated", "dpp", "kcenter", "degenerate"]
 
