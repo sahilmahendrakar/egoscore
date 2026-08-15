@@ -60,75 +60,85 @@ w = L.append
 
 w("# EgoScore — Validation Report")
 w("")
-w("**Track 1: The Curation Engine.** EgoVerse Data Optimization & Evaluation Suite, 2026-08-15.")
+w("**EgoVerse Data Optimization & Evaluation Suite, Track 1.** 2026-08-15.")
+w("")
+w("This is the detailed version. For the short one, see the [README](../README.md).")
 w("")
 w("---")
 w("")
-w("## The claim")
+w("## What we set out to test")
 w("")
-w("> At a fixed episode budget K, a quality-gated, coverage-maximizing subset trains a")
-w("> better policy than K episodes sampled uniformly at random.")
+w("> At a fixed number of clips, does a filtered, deliberately varied subset train a better")
+w("> model than the same number of clips picked at random?")
 w("")
-w("**Verdict: supported, with a bounded effect size and one important caveat** (see Limitations).")
+w("**Result: yes, by a small but consistent margin**, with one important caveat about what")
+w("that does and does not mean. Both are set out below.")
 w("")
-w("## Headline results")
+w("## Results")
 w("")
 n_tests = winrate("dpp")[1]
-w("| Selector | Paired wins vs random | Mean Avg-MSE change | Wilcoxon p |")
+w("| Selection method | Comparisons won | Prediction error vs random | Wilcoxon p |")
 w("|---|---|---|---|")
+NAMES = {
+    "dpp": "Log-determinant",
+    "kcenter": "k-center",
+    "curated": "Facility location",
+    "random_nogate": "Random, without the filtering step",
+    "degenerate": "Deliberately narrow *(designed to fail)*",
+}
 for cond in ["dpp", "kcenter", "curated", "random_nogate", "degenerate"]:
     wins, tot, pct = winrate(cond)
-    w(f"| `{cond}` | {wins}/{tot} | **{pct:+.2f}%** | {pval(cond):.1e} |")
+    direction = "lower" if pct < 0 else "higher"
+    cell = "no measurable difference" if pval(cond) > 0.05 else f"**{abs(pct):.2f}% {direction}**"
+    w(f"| {NAMES[cond]} | {wins}/{tot} | {cell} | {pval(cond):.1e} |")
 w("")
-w(f"Paired: each selector is compared to `random` at the *same seed and the same budget*,")
-w(f"evaluated on the *same* held-out windows. {n_tests} comparisons = {N_SEEDS} seeds x 2")
-w("budgets x 2 held-out axes. Wilcoxon signed-rank on the paired differences, two-sided.")
+w(f"Every method was compared against random selection using the same budget, the same")
+w(f"held-out clips, and the same model settings. {N_SEEDS} repeats x 2 budget sizes x 2")
+w(f"held-out conditions = **{n_tests} paired comparisons** per method. Significance from a")
+w("two-sided Wilcoxon signed-rank test on the paired differences.")
 w("")
-w(f"- **Diversity-based selection wins consistently.** `dpp` wins {winrate('dpp')[0]}/{n_tests} "
-  f"paired comparisons at {winrate('dpp')[2]:+.2f}% Avg-MSE (p={pval('dpp'):.0e}); "
-  f"`kcenter` {winrate('kcenter')[0]}/{n_tests}; facility location (`curated`) "
-  f"{winrate('curated')[0]}/{n_tests}.")
-w(f"- **The quality gate does *not* measurably help on this slice.** `random_nogate` is "
+w(f"- **Varied selection wins consistently.** Log-determinant wins {winrate('dpp')[0]}/{n_tests} "
+  f"comparisons at {abs(winrate('dpp')[2]):.2f}% lower error (p={pval('dpp'):.0e}); k-center "
+  f"{winrate('kcenter')[0]}/{n_tests}; facility location {winrate('curated')[0]}/{n_tests}.")
+w(f"- **The filtering step makes no measurable difference here.** Skipping it scores "
   f"{winrate('random_nogate')[0]}/{n_tests} at {winrate('random_nogate')[2]:+.2f}%, "
   f"sign-test p={float(sig.loc['random_nogate','p_sign']):.2f} — indistinguishable from no "
-  f"effect. That makes sense: the gate drops {n_drop} of {n_eps} `rl2` episodes, so there is "
-  f"almost nothing for filtering to remove. On `microagi` the same gate drops 15.9%, where it "
-  f"would presumably matter — but `microagi` has no operator or scene labels, so the experiment "
-  f"cannot be run there. **Selection matters here; filtering has nothing to bite on.**")
-w(f"- **The positive control fires.** `degenerate` — the same budget concentrated into as few "
-  f"operator x scene groups as possible — loses {winrate('degenerate')[0]}/{n_tests} at "
-  f"{winrate('degenerate')[2]:+.2f}% (p={pval('degenerate'):.0e}). See below for why this matters "
-  f"more than the headline.")
+  f"effect. That is expected: filtering removes only {n_drop} of {n_eps} clips in this "
+  f"collection, so there is very little for it to take out. We measured the filtering step "
+  f"separately, on a collection where it removes 1 in 7 — see the section below.")
+w(f"- **The control designed to fail does fail.** A selection drawn almost entirely from a "
+  f"handful of people and rooms wins only {winrate('degenerate')[0]}/{n_tests} at "
+  f"{winrate('degenerate')[2]:+.2f}% (p={pval('degenerate'):.0e}). The next section explains why "
+  f"that matters more than the headline number.")
 w("")
-w("## Why the positive control is the most important row")
+w("## Why the control matters more than the headline")
 w("")
-w("A curation result that only shows *our method beat random by 3%* is hard to trust: the")
-w("effect is small, the metric is a proxy, and the pool is a few hundred episodes. The")
-w("obvious failure mode is a harness too noisy to detect anything, where a 3% difference is")
-w("indistinguishable from luck.")
+w("A result showing only *our method beat random by 3%* is hard to trust. The effect is small,")
+w("the score is a proxy, and the pool is a few hundred clips. The obvious failure mode is a")
+w("measurement too noisy to distinguish anything, in which case a 3% difference is chance.")
 w("")
-w("So we included a condition that *should* lose, for a reason established independently by")
-w("the EgoVerse paper: demonstrator and scene diversity improve generalization. `degenerate`")
-w("spends the identical budget but concentrates it into a handful of operator x scene groups.")
+w("So we included a selection that *should* lose, for a reason established independently by the")
+w("EgoVerse authors: variety in demonstrators and scenes improves generalisation. This control")
+w("uses the identical budget but draws almost entirely from a handful of people and rooms.")
 d25 = paired[(paired.condition == "degenerate") & (paired.k_frac == 0.25)].iloc[0]
 w("")
 w(f"At K=25% it is **{d25['mse_unseen_operator_mean_pct']:+.1f}%** on unseen operators and "
   f"**{d25['mse_unseen_scene_mean_pct']:+.1f}%** on unseen scenes — a large, unambiguous, "
   f"correctly-signed effect.")
 w("")
-w("That tells us the harness *can* detect a diversity effect of the kind the paper reported.")
-w("The smaller curated-vs-random margin is therefore a measurement, not noise masquerading as one.")
+w("So the measurement *can* detect an effect of the kind the paper reported. The smaller margins")
+w("above are therefore measurements rather than noise.")
 w("")
 d50 = paired[(paired.condition == "degenerate") & (paired.k_frac == 0.50)].iloc[0]
-w(f"Note the control weakens at K=50% ({d50['mse_unseen_operator_mean_pct']:+.1f}% / "
-  f"{d50['mse_unseen_scene_mean_pct']:+.1f}%), exactly as it should: at half the pool you "
-  f"cannot concentrate the budget very much, so `degenerate` converges toward `random`. "
-  f"A control that stayed constant would have been suspicious.")
+w(f"The control also weakens at the larger budget ({d50['mse_unseen_operator_mean_pct']:+.1f}% / "
+  f"{d50['mse_unseen_scene_mean_pct']:+.1f}%), which is what should happen: with half the pool you "
+  f"cannot concentrate the selection very much, so it converges toward random. A control that "
+  f"stayed constant would have been grounds for suspicion.")
 w("")
-w("## The caveat we are not burying")
+w("## What this does not show")
 w("")
-w("**More data still beats better data at this scale.** Training on the full gated pool beats")
-w("every 25% and 50% subset, including ours:")
+w("**Training on the full collection remains the best option.** It beats every 25% and 50%")
+w("subset we selected, including the strongest one:")
 w("")
 w("| | unseen operator | unseen scene |")
 w("|---|---|---|")
@@ -136,49 +146,54 @@ w(f"| random, K=25% | {rand25['mse_unseen_operator']:.5f} | {rand25['mse_unseen_
 w(f"| best selector (dpp), K=25% | {best25['mse_unseen_operator']:.5f} | {best25['mse_unseen_scene']:.5f} |")
 w(f"| **all gated data (100%)** | **{ceiling['mse_unseen_operator']:.5f}** | **{ceiling['mse_unseen_scene']:.5f}** |")
 w("")
-w("The honest framing is therefore *not* \"throw away 75% of your data for free.\" It is:")
+w("The claim is therefore not \"discard 75% of the data at no cost\". It is:")
 w("")
 w(f"> At a quarter of the budget, diversity-aware selection closes "
   f"**{gap_closed['mse_unseen_operator']:.0f}%** (unseen operator) / "
   f"**{gap_closed['mse_unseen_scene']:.0f}%** (unseen scene) of the gap between a random quarter "
   f"and using everything.")
 w("")
-w("That is the useful claim for someone deciding what to label, transfer, or train on next.")
+w("That is the figure that matters when the full collection is not an option — deciding what to")
+w("record next, what to pay for annotation, or what will fit on a robot.")
 w("")
 w("## Method")
 w("")
-w("**Slice.** `fold_clothes`, `lab=rl2`, `human_bimanual` — 572 episodes, 20 operators, 16 scenes.")
-w("Chosen because it is the *only* slice in EgoVerse with a populated operator x scene grid:")
-w("`microagi` (9,896 fold_clothes episodes) has no operator or scene metadata at all, and")
-w("`mecka` has 2 scenes. Without that grid neither held-out axis is constructible.")
+w("**Data.** Clothes-folding clips from lab `rl2` — 572 clips, 20 people, 16 rooms. This is the")
+w("only collection in EgoVerse that records both who filmed each clip and where. `microagi`")
+w("(9,896 clothes-folding clips) records neither; `mecka` has 2 rooms. Without both, neither")
+w("held-out condition can be constructed.")
 w("")
-w("**Proxy metric.** Offline Avg-MSE of a ridge action-chunk policy: 10 frames of")
-w("proprioceptive history -> 30-step future bimanual EE pose chunk, predicted *relative to the")
-w("current pose* so the model cannot win by memorising absolute room coordinates. Random")
-w("Fourier features + closed-form ridge, so the fit is exact and seed-independent — any")
-w("difference between conditions comes from the data, not from optimiser noise.")
+w("**Score.** The model is shown 10 frames of where both hands have been and predicts their")
+w("positions over the next 30 frames (one second). We score squared error against what the")
+w("person actually did. Predictions are made *relative to the current hand position*, so the")
+w("model cannot score well by memorising which room it is in. The model is closed-form ridge")
+w("regression, so it has no training randomness: any difference between conditions comes from")
+w("the data rather than from optimiser noise.")
 w("")
-w("**Held-out axes.** Per seed we sample 25% of operators and 25% of scenes as held out.")
-w("Evaluation on unseen operators excludes held-out scenes and vice versa, so the two axes")
-w("measure different things. The training pool excludes both.")
+w("**Held-out conditions.** For each repeat we hold back 25% of the people and 25% of the rooms.")
+w("The unseen-person evaluation excludes held-back rooms and vice versa, so the two conditions")
+w("measure different things. Training excludes both.")
 w("")
-w("**Statistics.** Absolute Avg-MSE varies substantially across seeds because each seed draws")
-w("a different held-out split, which shifts every condition at once. Reporting raw means with")
-w("across-seed error bars would understate the effect. Since all conditions within a seed see")
-w("an identical split and identical evaluation windows, we report **paired** differences.")
+w("**Statistics.** Absolute error varies substantially between repeats, because each repeat holds")
+w("back a different set of people and rooms, shifting every method's score at once. Reporting raw")
+w("means with error bars across repeats would bury the effect in that variation. Since all methods")
+w("within a repeat see an identical split and identical evaluation clips, we report **paired**")
+w("differences and count wins.")
 w("")
-w("## Quality gate")
+w("## The filtering step")
 w("")
-w(f"{n_drop}/{n_eps} episodes dropped ({100.0*n_drop/n_eps:.1f}%).")
+w(f"{n_drop} of {n_eps} clips removed ({100.0*n_drop/n_eps:.1f}%). Every rule is arithmetic on the")
+w("recorded hand and head positions; no learned model is involved, and each removed clip records")
+w("which rule caught it.")
 w("")
 w(audit.to_markdown(index=False))
 w("")
-w("**What this says about the data:** `rl2` flagship data is essentially spotless — 1 episode")
-w("in 572. Zero have non-finite poses; zero have a frozen tracker. A gate designed around")
-w("imagined failure modes would find nothing here. The interesting prevalence is elsewhere:")
-w("see the cross-lab section.")
+w("**What this says about the data:** this collection is largely clean. No clip has missing or")
+w("frozen tracking. Almost every removal is for hand placement. A filter designed around imagined")
+w("failure modes would find nothing here — the interesting prevalence is in other collections, in")
+w("the cross-collection section below.")
 w("")
-w("### A rule we deleted")
+w("### A rule we got wrong")
 w("")
 w("An earlier version had a seventh rule that projected hand keypoints into the camera image")
 w("and flagged episodes where the hands left frame. It dropped 23 episodes. We then rendered")

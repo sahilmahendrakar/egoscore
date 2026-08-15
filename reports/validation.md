@@ -1,56 +1,59 @@
 # EgoScore — Validation Report
 
-**Track 1: The Curation Engine.** EgoVerse Data Optimization & Evaluation Suite, 2026-08-15.
+**EgoVerse Data Optimization & Evaluation Suite, Track 1.** 2026-08-15.
+
+This is the detailed version. For the short one, see the [README](../README.md).
 
 ---
 
-## The claim
+## What we set out to test
 
-> At a fixed episode budget K, a quality-gated, coverage-maximizing subset trains a
-> better policy than K episodes sampled uniformly at random.
+> At a fixed number of clips, does a filtered, deliberately varied subset train a better
+> model than the same number of clips picked at random?
 
-**Verdict: supported, with a bounded effect size and one important caveat** (see Limitations).
+**Result: yes, by a small but consistent margin**, with one important caveat about what
+that does and does not mean. Both are set out below.
 
-## Headline results
+## Results
 
-| Selector | Paired wins vs random | Mean Avg-MSE change | Wilcoxon p |
+| Selection method | Comparisons won | Prediction error vs random | Wilcoxon p |
 |---|---|---|---|
-| `dpp` | 40/40 | **-3.53%** | 1.8e-12 |
-| `kcenter` | 40/40 | **-3.45%** | 1.8e-12 |
-| `curated` | 33/40 | **-2.14%** | 1.6e-08 |
-| `random_nogate` | 24/40 | **+0.02%** | 5.2e-01 |
-| `degenerate` | 1/40 | **+5.83%** | 5.5e-12 |
+| Log-determinant | 40/40 | **3.53% lower** | 1.8e-12 |
+| k-center | 40/40 | **3.45% lower** | 1.8e-12 |
+| Facility location | 33/40 | **2.14% lower** | 1.6e-08 |
+| Random, without the filtering step | 24/40 | no measurable difference | 5.2e-01 |
+| Deliberately narrow *(designed to fail)* | 1/40 | **5.83% higher** | 5.5e-12 |
 
-Paired: each selector is compared to `random` at the *same seed and the same budget*,
-evaluated on the *same* held-out windows. 40 comparisons = 10 seeds x 2
-budgets x 2 held-out axes. Wilcoxon signed-rank on the paired differences, two-sided.
+Every method was compared against random selection using the same budget, the same
+held-out clips, and the same model settings. 10 repeats x 2 budget sizes x 2
+held-out conditions = **40 paired comparisons** per method. Significance from a
+two-sided Wilcoxon signed-rank test on the paired differences.
 
-- **Diversity-based selection wins consistently.** `dpp` wins 40/40 paired comparisons at -3.53% Avg-MSE (p=2e-12); `kcenter` 40/40; facility location (`curated`) 33/40.
-- **The quality gate does *not* measurably help on this slice.** `random_nogate` is 24/40 at +0.02%, sign-test p=0.27 — indistinguishable from no effect. That makes sense: the gate drops 49 of 572 `rl2` episodes, so there is almost nothing for filtering to remove. On `microagi` the same gate drops 15.9%, where it would presumably matter — but `microagi` has no operator or scene labels, so the experiment cannot be run there. **Selection matters here; filtering has nothing to bite on.**
-- **The positive control fires.** `degenerate` — the same budget concentrated into as few operator x scene groups as possible — loses 1/40 at +5.83% (p=5e-12). See below for why this matters more than the headline.
+- **Varied selection wins consistently.** Log-determinant wins 40/40 comparisons at 3.53% lower error (p=2e-12); k-center 40/40; facility location 33/40.
+- **The filtering step makes no measurable difference here.** Skipping it scores 24/40 at +0.02%, sign-test p=0.27 — indistinguishable from no effect. That is expected: filtering removes only 49 of 572 clips in this collection, so there is very little for it to take out. We measured the filtering step separately, on a collection where it removes 1 in 7 — see the section below.
+- **The control designed to fail does fail.** A selection drawn almost entirely from a handful of people and rooms wins only 1/40 at +5.83% (p=5e-12). The next section explains why that matters more than the headline number.
 
-## Why the positive control is the most important row
+## Why the control matters more than the headline
 
-A curation result that only shows *our method beat random by 3%* is hard to trust: the
-effect is small, the metric is a proxy, and the pool is a few hundred episodes. The
-obvious failure mode is a harness too noisy to detect anything, where a 3% difference is
-indistinguishable from luck.
+A result showing only *our method beat random by 3%* is hard to trust. The effect is small,
+the score is a proxy, and the pool is a few hundred clips. The obvious failure mode is a
+measurement too noisy to distinguish anything, in which case a 3% difference is chance.
 
-So we included a condition that *should* lose, for a reason established independently by
-the EgoVerse paper: demonstrator and scene diversity improve generalization. `degenerate`
-spends the identical budget but concentrates it into a handful of operator x scene groups.
+So we included a selection that *should* lose, for a reason established independently by the
+EgoVerse authors: variety in demonstrators and scenes improves generalisation. This control
+uses the identical budget but draws almost entirely from a handful of people and rooms.
 
 At K=25% it is **+10.9%** on unseen operators and **+7.4%** on unseen scenes — a large, unambiguous, correctly-signed effect.
 
-That tells us the harness *can* detect a diversity effect of the kind the paper reported.
-The smaller curated-vs-random margin is therefore a measurement, not noise masquerading as one.
+So the measurement *can* detect an effect of the kind the paper reported. The smaller margins
+above are therefore measurements rather than noise.
 
-Note the control weakens at K=50% (+3.0% / +2.0%), exactly as it should: at half the pool you cannot concentrate the budget very much, so `degenerate` converges toward `random`. A control that stayed constant would have been suspicious.
+The control also weakens at the larger budget (+3.0% / +2.0%), which is what should happen: with half the pool you cannot concentrate the selection very much, so it converges toward random. A control that stayed constant would have been grounds for suspicion.
 
-## The caveat we are not burying
+## What this does not show
 
-**More data still beats better data at this scale.** Training on the full gated pool beats
-every 25% and 50% subset, including ours:
+**Training on the full collection remains the best option.** It beats every 25% and 50%
+subset we selected, including the strongest one:
 
 | | unseen operator | unseen scene |
 |---|---|---|
@@ -58,37 +61,42 @@ every 25% and 50% subset, including ours:
 | best selector (dpp), K=25% | 0.10893 | 0.09810 |
 | **all gated data (100%)** | **0.10226** | **0.09209** |
 
-The honest framing is therefore *not* "throw away 75% of your data for free." It is:
+The claim is therefore not "discard 75% of the data at no cost". It is:
 
 > At a quarter of the budget, diversity-aware selection closes **49%** (unseen operator) / **41%** (unseen scene) of the gap between a random quarter and using everything.
 
-That is the useful claim for someone deciding what to label, transfer, or train on next.
+That is the figure that matters when the full collection is not an option — deciding what to
+record next, what to pay for annotation, or what will fit on a robot.
 
 ## Method
 
-**Slice.** `fold_clothes`, `lab=rl2`, `human_bimanual` — 572 episodes, 20 operators, 16 scenes.
-Chosen because it is the *only* slice in EgoVerse with a populated operator x scene grid:
-`microagi` (9,896 fold_clothes episodes) has no operator or scene metadata at all, and
-`mecka` has 2 scenes. Without that grid neither held-out axis is constructible.
+**Data.** Clothes-folding clips from lab `rl2` — 572 clips, 20 people, 16 rooms. This is the
+only collection in EgoVerse that records both who filmed each clip and where. `microagi`
+(9,896 clothes-folding clips) records neither; `mecka` has 2 rooms. Without both, neither
+held-out condition can be constructed.
 
-**Proxy metric.** Offline Avg-MSE of a ridge action-chunk policy: 10 frames of
-proprioceptive history -> 30-step future bimanual EE pose chunk, predicted *relative to the
-current pose* so the model cannot win by memorising absolute room coordinates. Random
-Fourier features + closed-form ridge, so the fit is exact and seed-independent — any
-difference between conditions comes from the data, not from optimiser noise.
+**Score.** The model is shown 10 frames of where both hands have been and predicts their
+positions over the next 30 frames (one second). We score squared error against what the
+person actually did. Predictions are made *relative to the current hand position*, so the
+model cannot score well by memorising which room it is in. The model is closed-form ridge
+regression, so it has no training randomness: any difference between conditions comes from
+the data rather than from optimiser noise.
 
-**Held-out axes.** Per seed we sample 25% of operators and 25% of scenes as held out.
-Evaluation on unseen operators excludes held-out scenes and vice versa, so the two axes
-measure different things. The training pool excludes both.
+**Held-out conditions.** For each repeat we hold back 25% of the people and 25% of the rooms.
+The unseen-person evaluation excludes held-back rooms and vice versa, so the two conditions
+measure different things. Training excludes both.
 
-**Statistics.** Absolute Avg-MSE varies substantially across seeds because each seed draws
-a different held-out split, which shifts every condition at once. Reporting raw means with
-across-seed error bars would understate the effect. Since all conditions within a seed see
-an identical split and identical evaluation windows, we report **paired** differences.
+**Statistics.** Absolute error varies substantially between repeats, because each repeat holds
+back a different set of people and rooms, shifting every method's score at once. Reporting raw
+means with error bars across repeats would bury the effect in that variation. Since all methods
+within a repeat see an identical split and identical evaluation clips, we report **paired**
+differences and count wins.
 
-## Quality gate
+## The filtering step
 
-49/572 episodes dropped (8.6%).
+49 of 572 clips removed (8.6%). Every rule is arithmetic on the
+recorded hand and head positions; no learned model is involved, and each removed clip records
+which rule caught it.
 
 | rule               | signal           | test                  |   n_flagged |      pct | meaning                                                                               |
 |:-------------------|:-----------------|:----------------------|------------:|---------:|:--------------------------------------------------------------------------------------|
@@ -103,12 +111,12 @@ an identical split and identical evaluation windows, we report **paired** differ
 | suspiciously_short | duration_s       | lt 0.15x median (14s) |           1 | 0.174825 | under 15% of the median episode length — a fragment, not a demo                       |
 | ANY (dropped)      | -                | -                     |          49 | 8.56643  | union of all rules over 572 episodes                                                  |
 
-**What this says about the data:** `rl2` flagship data is essentially spotless — 1 episode
-in 572. Zero have non-finite poses; zero have a frozen tracker. A gate designed around
-imagined failure modes would find nothing here. The interesting prevalence is elsewhere:
-see the cross-lab section.
+**What this says about the data:** this collection is largely clean. No clip has missing or
+frozen tracking. Almost every removal is for hand placement. A filter designed around imagined
+failure modes would find nothing here — the interesting prevalence is in other collections, in
+the cross-collection section below.
 
-### A rule we deleted
+### A rule we got wrong
 
 An earlier version had a seventh rule that projected hand keypoints into the camera image
 and flagged episodes where the hands left frame. It dropped 23 episodes. We then rendered
