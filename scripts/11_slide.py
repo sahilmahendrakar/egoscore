@@ -74,26 +74,28 @@ txt(0.035, 0.900,
 # ------------------------------------------------------------------ the setup
 txt(0.035, 0.838, "THE PROBLEM", 10, FAINT, "bold")
 txt(0.035, 0.800,
-    "EgoVerse is a library of videos of people doing everyday tasks, filmed\n"
-    "from a camera on their head. Robots learn from them. It holds hundreds of\n"
-    "thousands of clips, and more is not automatically better: some are broken,\n"
-    "and many are near-copies of each other.", 12.5, INK, va="top")
+    "EgoVerse is a library of videos of people performing everyday tasks,\n"
+    "recorded from a head-worn camera. Robots learn manipulation from them.\n"
+    "Some of its clips are unusable — the hand tracking fails, or a recording\n"
+    "covers a whole session rather than one task. Many others are\n"
+    "near-duplicates that add training time without adding information.",
+    12.3, INK, va="top")
 
-txt(0.035, 0.648, "WHAT WE BUILT", 10, FAINT, "bold")
+txt(0.035, 0.632, "HOW IT WORKS", 10, FAINT, "bold")
 steps = [
-    ("1", "Throw out the broken ones.", "Tracking glitches, hands off to the side, or someone\n"
-     "who left the camera running for ten minutes."),
-    ("2", "Pick a varied quarter of the rest.", "Instead of picking at random, choose clips unlike each\n"
-     "other — different people, rooms and ways of moving."),
-    ("3", "Check whether it worked.", "Train the same small model on each selection and see\n"
-     "which better predicts what a person does next."),
+    ("1", "Remove clips that are unusable.", "Eight checks on the recorded positions: frozen tracking,\n"
+     "a hand jumping past 10 m/s, a clip over 3× its lab's median."),
+    ("2", "Select a varied subset of the rest.", "Summarise each clip as 41 numbers describing how the person\n"
+     "moved, then choose clips unlike one another, not at random."),
+    ("3", "Measure whether it helped.", "Train an identical model on each subset; score it on clips from\n"
+     "people and rooms absent from its training."),
 ]
-y = 0.605
+y = 0.585
 for n, head, body in steps:
     txt(0.038, y, n, 13, ACC, "bold")
     txt(0.060, y, head, 13, INK, "bold")
     txt(0.060, y - 0.028, body, 11, MUTED, va="top")
-    y -= 0.098
+    y -= 0.088
 
 # ------------------------------------------------------------------ the picture
 ax = fig.add_axes([0.415, 0.470, 0.565, 0.415])
@@ -105,60 +107,65 @@ ax.axis("off")
 box(0.415, 0.320, 0.565, 0.118, "#f0fdf4", "#86efac")
 txt(0.432, 0.408, "THE RESULT", 10, FAINT, "bold")
 txt(0.432, 0.375,
-    f"The varied quarter beat the random quarter in all {BEST_WINS} of our",
+    f"The varied quarter beat the random quarter in all {BEST_WINS} of",
     14.5, INK, "bold")
 txt(0.432, 0.348,
-    f"{N_TESTS} comparisons, cutting the model's prediction error by {BEST_PCT:.1f}%.",
+    f"{N_TESTS} comparisons, with {BEST_PCT:.1f}% lower prediction error.",
     14.5, INK, "bold")
 
 # ------------------------------------------------------------------ bottom panels
-top, h = 0.058, 0.245
+top, h = 0.052, 0.258
 w, gapx = 0.2215, 0.0165
 panels = [
-    ("How do we know it's real?",
-     f"A {BEST_PCT:.0f}% difference is small enough to be luck, so\n"
-     "we also ran a selection built to be bad on purpose:\n"
-     "nearly every clip from a handful of people and rooms.\n\n"
-     f"It lost {CTRL_LOSSES} of {N_TESTS} times, doing {CTRL_PCT:+.0f}% worse. So our test\n"
-     "can tell a good selection from a bad one, and the\n"
-     "smaller result is a real effect rather than noise.",
+    ("Why the margin is credible",
+     f"A {BEST_PCT:.0f}% margin is small enough to be chance, so we\n"
+     "included a selection designed to fail: the same clip\n"
+     "count, drawn almost entirely from a handful of\n"
+     "people in a handful of rooms.\n\n"
+     f"It lost {CTRL_LOSSES} of {N_TESTS} comparisons, {CTRL_PCT:+.0f}% worse. The\n"
+     "measurement can therefore tell a good selection\n"
+     "from a poor one, which makes the smaller margins\n"
+     "measurements rather than noise.",
      "#f0fdf4", "#86efac"),
-    ("What we're not claiming",
-     "Using all the data is still best. Picking well does\n"
-     "not beat having more.\n\n"
-     "What it does do: at a quarter of the data, a varied\n"
-     f"pick closes about {gap:.0f}% of the gap between a random\n"
-     "quarter and using everything. That is the number\n"
-     "that matters when you can't have everything.",
+    ("What this does not show",
+     "Training on the full collection remains best. It\n"
+     "beats every subset we selected. Choosing well does\n"
+     "not substitute for having more.\n\n"
+     "The narrower claim: at a quarter of the data, a varied\n"
+     f"selection recovers about {gap:.0f}% of the difference between\n"
+     "a random quarter and the full collection — the figure\n"
+     "that matters when everything is not an option.",
      "#fffbeb", "#fcd34d"),
-    ("What we found in the data",
-     "Some labs film one task per clip. Others leave the\n"
-     "camera running for a whole session and call it one\n"
-     "clip. A clip is 90 seconds in one lab and 11 in\n"
-     f"another — {xlab.loc['microagi','ANY']} of the biggest collection is really\n"
-     "a whole session.\n\n"
-     f"Cutting those makes the model {gf_pct:.0f}% better, using\n"
-     "the same amount of footage.",
+    ("A finding about EgoVerse",
+     "A clip is not a consistent unit. Median length is\n"
+     "90 seconds in one collection and 11 in another;\n"
+     f"{xlab.loc['microagi','ANY']} of the largest collection is a whole session\n"
+     "stored as one file.\n\n"
+     "Matched on clip count, removing those looks harmful\n"
+     "(1.7% worse) — but one long clip holds 60× the\n"
+     f"footage. Matched on footage, removing them is {gf_pct:.0f}%\n"
+     "better, 10 comparisons out of 10.",
      "#eff6ff", "#93c5fd"),
-    ("Where we'd push back",
-     "We measure how well a model predicts human hand\n"
-     "movement, not whether a robot succeeds at the\n"
-     "task. It is a stand-in — and the people who built\n"
-     "EgoVerse use the same one, for the same reason.\n\n"
-     "We tested one task in one lab. We can't promise\n"
-     "this carries over to others.",
+    ("Limitations",
+     "The score measures how accurately a model predicts\n"
+     "human hand motion, not whether a robot completes\n"
+     "the task. The EgoVerse authors use the same proxy\n"
+     "for the same reason, and say so in their paper.\n\n"
+     "The scoring model never sees the video — a\n"
+     "consequence of the 84.6 GB figure.\n\n"
+     "One task, one collection. Transfer is untested.",
      "#fef2f2", "#fca5a5"),
 ]
 for i, (title, body, bg, edge) in enumerate(panels):
     x = 0.035 + i * (w + gapx)
     box(x, top, w, h, bg, edge)
     txt(x + 0.013, top + h - 0.030, title, 12.5, INK, "bold")
-    txt(x + 0.013, top + h - 0.062, body, 9.4, "#27272a", va="top", lh=1.55)
+    txt(x + 0.013, top + h - 0.060, body, 8.8, "#27272a", va="top", lh=1.5)
 
 txt(0.035, 0.026,
-    f"Tested on 572 clips of people folding clothes, filmed by 20 people across 16 rooms. "
-    f"We dropped {n_drop} as unusable, then compared selections of the rest. "
-    "Full method, code and caveats in the repo.", 10, MUTED)
+    f"Tested on 572 clothes-folding clips recorded by 20 people across 16 rooms — the only EgoVerse collection that records "
+    f"who filmed each clip and where, which the held-out comparison requires. {n_drop} removed as unusable. "
+    "Full method, code and limitations in the repo.", 10, MUTED)
 
 out_png = REPORTS / "egoscore_summary_slide.png"
 out_pdf = REPORTS / "egoscore_summary_slide.pdf"
